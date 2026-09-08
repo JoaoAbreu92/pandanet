@@ -13,6 +13,13 @@ interface SuperAdminPageProps {
     onImpersonate: (company: Company) => void;
 }
 
+type BooleanEmployeePermissionKey = {
+    [Key in keyof EmployeePermissions]-?:
+        Exclude<EmployeePermissions[Key], undefined> extends boolean
+            ? Key
+            : never;
+}[keyof EmployeePermissions];
+
 const SubscriptionModal: React.FC<{
     company: Company;
     onClose: () => void;
@@ -58,14 +65,14 @@ const CompanyFeaturesModal: React.FC<{
 }> = ({ company, onClose, onSave }) => {
     const [features, setFeatures] = useState(company.plan.features);
 
-    const RH_PERMISSIONS: (keyof EmployeePermissions)[] = ['viewDirectory', 'viewForms', 'viewBenefits', 'viewOnboarding', 'viewRecognition', 'viewDocuments'];
-    const TI_PERMISSIONS: (keyof EmployeePermissions)[] = ['viewTiDashboard', 'openTickets', 'openTiRequests'];
+    const RH_PERMISSIONS: BooleanEmployeePermissionKey[] = ['viewDirectory', 'viewForms', 'viewBenefits', 'viewOnboarding', 'viewRecognition', 'viewDocuments'];
+    const TI_PERMISSIONS: BooleanEmployeePermissionKey[] = ['viewTiDashboard', 'openTickets', 'openTiRequests'];
 
-    const handleFeatureChange = (feature: keyof EmployeePermissions, value: boolean) => {
+    const handleFeatureChange = (feature: BooleanEmployeePermissionKey, value: boolean) => {
         setFeatures(prev => ({...prev, [feature]: value}));
     };
     
-    const handleGroupChange = (groupPermissions: (keyof EmployeePermissions)[], value: boolean) => {
+    const handleGroupChange = (groupPermissions: BooleanEmployeePermissionKey[], value: boolean) => {
         const newFeatures = {...features};
         groupPermissions.forEach(perm => {
             newFeatures[perm] = value;
@@ -73,7 +80,7 @@ const CompanyFeaturesModal: React.FC<{
         setFeatures(newFeatures);
     };
 
-    const isGroupEnabled = (groupPermissions: (keyof EmployeePermissions)[]) => {
+    const isGroupEnabled = (groupPermissions: BooleanEmployeePermissionKey[]) => {
         return groupPermissions.every(perm => features[perm]);
     };
     
@@ -83,7 +90,7 @@ const CompanyFeaturesModal: React.FC<{
         onClose();
     };
 
-    const FeatureCheckbox: React.FC<{label: string, featureKey: keyof EmployeePermissions}> = ({ label, featureKey }) => (
+    const FeatureCheckbox: React.FC<{label: string, featureKey: BooleanEmployeePermissionKey}> = ({ label, featureKey }) => (
          <label className="flex items-center space-x-2 p-2 bg-gray-50 hover:bg-gray-100 rounded-md cursor-pointer border border-gray-200">
             <input
                 type="checkbox"
@@ -95,7 +102,7 @@ const CompanyFeaturesModal: React.FC<{
         </label>
     );
 
-    const GroupCheckbox: React.FC<{label: string, permissions: (keyof EmployeePermissions)[]}> = ({label, permissions}) => (
+    const GroupCheckbox: React.FC<{label: string, permissions: BooleanEmployeePermissionKey[]}> = ({label, permissions}) => (
         <label className="flex items-center space-x-2 p-2 bg-gray-100 hover:bg-gray-200 rounded-md font-bold cursor-pointer border border-gray-300">
             <input
                 type="checkbox"
@@ -194,7 +201,7 @@ const SuperAdminPage: React.FC<SuperAdminPageProps> = ({ companies, setCompanies
                 </header>
                 <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 space-y-8">
                      <div className="border-b border-gray-200">
-                        <nav role="tablist" aria-label="Seções do Super Admin" className="-mb-px flex space-x-6" aria-label="Tabs">
+                        <nav role="tablist" aria-label="Seções do Super Admin" className="-mb-px flex space-x-6">
                             <button id="super-admin-tab-companies" role="tab" aria-selected={activeTab === 'companies'} tabIndex={activeTab === 'companies' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setActiveTab('companies')} className={`${activeTab === 'companies' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'} py-4 px-1 border-b-2 font-medium text-sm transition-colors`}>Empresas</button>
                             <button id="super-admin-tab-plans" role="tab" aria-selected={activeTab === 'plans'} tabIndex={activeTab === 'plans' ? 0 : -1} onKeyDown={handleTabKeyDown} onClick={() => setActiveTab('plans')} className={`${activeTab === 'plans' ? 'border-brand-primary text-brand-primary' : 'border-transparent text-gray-500 hover:text-gray-700'} py-4 px-1 border-b-2 font-medium text-sm transition-colors`}>Planos</button>
                         </nav>

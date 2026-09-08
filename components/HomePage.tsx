@@ -7,7 +7,10 @@ import CompanyPoll from './CompanyPoll';
 import QuickLinks from './QuickLinks';
 import PremiumWeatherWidget from './PremiumWeatherWidget';
 import PremiumHeroCalendar from './PremiumHeroCalendar';
-import { supabase, getSignedStorageUrl } from '../supabaseClient';
+import PremiumDailyCenter from './PremiumDailyCenter';
+import { supabase } from '../supabaseClient';
+import { brandingReference } from './brandingStorage';
+import { BrandingImage, BrandingVideo } from './BrandingMedia';
 import type { Employee, AppData } from '../types';
 import Card from './Card';
 import { GiftIcon, UserPlusIcon, VideoCameraIcon, BuildingStorefrontIcon, ClipboardDocumentCheckIcon, Cog6ToothIcon, CalendarDaysIcon, ChatBubbleLeftRightIcon, FolderIcon, SparklesIcon, ChevronRightIcon, UsersIcon, TrophyIcon } from './icons';
@@ -105,7 +108,7 @@ const MasterBanner: React.FC = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Verificar se pode editar: masteradmin (grupopixel.com.br) ou Super Admin
-    const canEdit = profile?.role === 'Super Admin' || 
+    const canEdit = profile?.role === 'Super Admin' ||
                     (profile?.email || '').toLowerCase().endsWith('@grupopixel.com.br');
 
     useEffect(() => {
@@ -152,7 +155,7 @@ const MasterBanner: React.FC = () => {
                 .from('chat-media')
                 .upload(path, file, { upsert: true });
             if (upErr) throw upErr;
-            const publicUrl = await getSignedStorageUrl(`https://pandanet.grupopixel.com.br/storage/v1/object/public/chat-media/${path}`);
+            const publicUrl = brandingReference(`https://pandanet.grupopixel.com.br/storage/v1/object/public/chat-media/${path}`);
             if (isVideo) {
                 setEditForm(prev => ({ ...prev, videoUrl: publicUrl, imageUrl: '' }));
             } else {
@@ -167,12 +170,14 @@ const MasterBanner: React.FC = () => {
 
     const handleSave = async () => {
         try {
-            const payload = JSON.stringify(editForm);
+            const savedForm = { ...editForm, imageUrl: brandingReference(editForm.imageUrl),
+                videoUrl: brandingReference(editForm.videoUrl || '') };
+            const payload = JSON.stringify(savedForm);
             const { error } = await supabase
                 .from('system_settings')
                 .upsert({ key: 'master_banner', value: payload }, { onConflict: 'key' });
             if (error) throw error;
-            setBannerData(editForm);
+            setBannerData(savedForm);
             setIsEditing(false);
         } catch (err: any) {
             alert('Erro ao salvar banner: ' + err.message);
@@ -190,14 +195,14 @@ const MasterBanner: React.FC = () => {
             {hasContent && (
                 <div className="w-full relative group overflow-hidden rounded-none md:rounded-[2.5rem] shadow-2xl border-y md:border border-gray-100/50 dark:border-gray-800/50 animate-in fade-in slide-in-from-bottom-6 duration-1000">
                     {bannerData!.videoUrl ? (
-                        <video
+                        <BrandingVideo
                             src={bannerData!.videoUrl}
                             autoPlay muted loop playsInline
                             className="w-full object-cover h-[180px] sm:h-[280px] md:h-[415px] lg:h-[515px]"
                         />
                     ) : bannerData!.link ? (
                         <a href={bannerData!.link} target="_blank" rel="noopener noreferrer" className="block">
-                            <img
+                            <BrandingImage
                                 src={bannerData!.imageUrl}
                                 alt="Banner Master"
                                 className="w-full object-cover transition-transform duration-700 group-hover:scale-[1.02] h-[180px] sm:h-[280px] md:h-[415px] lg:h-[515px]"
@@ -211,7 +216,7 @@ const MasterBanner: React.FC = () => {
                             )}
                         </a>
                     ) : (
-                        <img
+                        <BrandingImage
                             src={bannerData!.imageUrl}
                             alt="Banner Master"
                             className="w-full object-cover h-[180px] sm:h-[280px] md:h-[415px] lg:h-[515px]"
@@ -276,7 +281,7 @@ const MasterBanner: React.FC = () => {
                                 {editForm.videoUrl ? (
                                     <video src={editForm.videoUrl} className="w-full max-h-40 object-cover" muted autoPlay loop />
                                 ) : (
-                                    <img src={editForm.imageUrl} alt="preview" className="w-full max-h-40 object-cover" />
+                                    <BrandingImage src={editForm.imageUrl} alt="preview" className="w-full max-h-40 object-cover" />
                                 )}
                             </div>
                         )}
@@ -349,7 +354,7 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
     const [loading, setLoading] = useState(true);
     const [latestMarketplaces, setLatestMarketplaces] = useState<any[]>([]);
     const [latestProjects, setLatestProjects] = useState<any[]>([]);
-    
+
     const projectsScrollRef = React.useRef<HTMLDivElement>(null);
     const marketScrollRef = React.useRef<HTMLDivElement>(null);
 
@@ -359,7 +364,7 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
             ref.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
         }
     };
-    
+
     const [isEditingVideo, setIsEditingVideo] = useState(false);
     const [videoInputs, setVideoInputs] = useState<string[]>(['', '', '', '', '']);
 
@@ -382,7 +387,7 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
                 .select('value')
                 .eq('key', `company_video_${companyId}`)
                 .maybeSingle();
-            
+
             if (videoSetting?.value) {
                 const val = videoSetting.value.trim();
                 let urls: string[] = [];
@@ -397,7 +402,7 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
                 }
                 urls = urls.filter(u => u.length > 0).slice(0, 5);
                 setYoutubeUrls(urls);
-                
+
                 const inputs = ['', '', '', '', ''];
                 urls.forEach((url, idx) => {
                     if (idx < 5) inputs[idx] = url;
@@ -502,11 +507,11 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
         try {
             const urlsToSave = videoInputs.map(u => u.trim()).filter(u => u.length > 0);
             const valueToSave = urlsToSave.join(',');
-            
+
             const { error } = await supabase
                 .from('system_settings')
                 .upsert({ key: `company_video_${companyId}`, value: valueToSave }, { onConflict: 'key' });
-            
+
             if (error) throw error;
             setYoutubeUrls(urlsToSave);
             setActiveVideoIndex(0);
@@ -610,7 +615,7 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                             allowFullScreen
                         />
-                        
+
                         {/* Seta Esquerda */}
                         <button
                             onClick={(e) => {
@@ -624,7 +629,7 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
                             </svg>
                         </button>
-                        
+
                         {/* Seta Direita */}
                         <button
                             onClick={(e) => {
@@ -781,7 +786,7 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
                                     </div>
                                 </div>
                             ))}
-                            
+
                             {/* Card Gradiente Especial "Ver Todos" no Final */}
                             <div
                                 onClick={() => onNavigate('marketplace')}
@@ -810,7 +815,7 @@ const CompanyHighlightsWidget: React.FC<CompanyHighlightsWidgetProps> = ({ onNav
                             <button onClick={() => setIsEditingVideo(false)} className="text-slate-450 hover:text-slate-650 text-lg font-bold">&times;</button>
                         </div>
                         <p className="text-xs text-slate-450 dark:text-slate-500">Cole até 5 URLs do YouTube. Caso adicione mais de um vídeo, eles serão exibidos em estilo carrossel.</p>
-                        
+
                         <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
                             {videoInputs.map((val, idx) => (
                                 <div key={idx} className="space-y-1">
@@ -898,9 +903,9 @@ const PendingTrainingsWidget: React.FC<{ currentUser: Employee; onNavigate: (pag
 
                 if (trainings) {
                     const completedIds = new Set(submissions?.map(s => s.training_id) || []);
-                    const pending = trainings.filter(t => 
-                        t.participants && 
-                        t.participants.includes(currentUser.id) && 
+                    const pending = trainings.filter(t =>
+                        t.participants &&
+                        t.participants.includes(currentUser.id) &&
                         !completedIds.has(t.id)
                     );
                     setPendingTrainings(pending);
@@ -921,8 +926,8 @@ const PendingTrainingsWidget: React.FC<{ currentUser: Employee; onNavigate: (pag
         <Card title="🎓 Treinamentos Pendentes" className="border border-brand-primary/10">
             <div className="space-y-3">
                 {pendingTrainings.map(t => (
-                    <div 
-                        key={t.id} 
+                    <div
+                        key={t.id}
                         onClick={() => onNavigate('training')}
                         className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 border dark:border-slate-800 cursor-pointer transition-all flex justify-between items-center group"
                     >
@@ -1061,61 +1066,16 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees, currentUser 
         return date >= thirtyDaysAgo;
     }).length;
     return (
-        <div className="space-y-6 pb-10">
-            <section className="relative overflow-hidden rounded-[2rem] border border-emerald-200/70 dark:border-emerald-900/50 bg-gradient-to-br from-slate-100 via-emerald-50 to-teal-100 text-slate-900 dark:from-slate-950 dark:via-emerald-950 dark:to-teal-900 dark:text-white shadow-[0_28px_70px_-34px_rgba(5,150,105,0.75)]">
-                <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl" />
-                <div className="absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
-                <div className="relative grid grid-cols-1 xl:grid-cols-[1.05fr_1fr] gap-7 p-6 sm:p-8">
-                    <div className="flex flex-col justify-between gap-7">
-                        <div>
-                            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/70 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:border-white/15 dark:bg-white/10 dark:text-emerald-100 backdrop-blur-md">
-                                <SparklesIcon className="h-4 w-4" />
-                                Seu dia no PandaNet
-                            </div>
-                            <h1 className="mt-5 text-3xl sm:text-4xl font-black tracking-tight">
-                                {greeting}, {firstName}!
-                            </h1>
-                            <p className="mt-2 max-w-xl text-sm sm:text-base text-slate-600 capitalize dark:text-slate-300">
-                                {todayLabel}. Tudo o que importa para sua rotina, em um só lugar.
-                            </p>
-                        </div>
-
-                        <PremiumHeroCalendar
-                            onNavigate={onNavigate}
-                            currentUser={currentUser}
-                            employees={employees}
-                        />
-
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl">
-                            <div className="rounded-2xl border border-emerald-200/80 bg-white/70 p-3.5 backdrop-blur-md dark:border-white/10 dark:bg-white/10">
-                                <UsersIcon className="h-5 w-5 text-cyan-300" />
-                                <p className="mt-2 text-xl font-black">{employees.length}</p>
-                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-300">Pessoas</p>
-                            </div>
-                            <div className="rounded-2xl border border-emerald-200/80 bg-white/70 p-3.5 backdrop-blur-md dark:border-white/10 dark:bg-white/10">
-                                <GiftIcon className="h-5 w-5 text-amber-300" />
-                                <p className="mt-2 text-xl font-black">{birthdaysThisMonth}</p>
-                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-300">Aniversários</p>
-                            </div>
-                            <div className="rounded-2xl border border-emerald-200/80 bg-white/70 p-3.5 backdrop-blur-md dark:border-white/10 dark:bg-white/10">
-                                <TrophyIcon className="h-5 w-5 text-emerald-300" />
-                                <p className="mt-2 text-xl font-black">{recentAwards.length}</p>
-                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-300">Conquistas</p>
-                            </div>
-                            <div className="rounded-2xl border border-emerald-200/80 bg-white/70 p-3.5 backdrop-blur-md dark:border-white/10 dark:bg-white/10">
-                                <UserPlusIcon className="h-5 w-5 text-violet-500 dark:text-violet-300" />
-                                <p className="mt-2 text-xl font-black">{newHiresThisMonth}</p>
-                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-300">Novos talentos</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex min-w-0 flex-col gap-4">
-                        <PremiumWeatherWidget userId={currentUser.id} />
-                        <QuickLinks onNavigate={onNavigate} currentUser={currentUser} variant="hero" />
-                    </div>
-                </div>
-            </section>
+        <div className="pandanet-home-page space-y-6 pb-10">
+            <PremiumDailyCenter
+                currentUser={currentUser}
+                employees={employees}
+                onNavigate={onNavigate}
+                peopleCount={employees.length}
+                birthdayCount={birthdaysThisMonth}
+                awardCount={recentAwards.length}
+                newHireCount={newHiresThisMonth}
+            />
 
             {/* Banner Master - visível para todos, editável só pelo Masteradmin/GrupoPixel */}
             <MasterBanner />
@@ -1146,18 +1106,18 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees, currentUser 
                                     </p>
                                 </div>
                             </div>
-                            
+
                             <div className="grid grid-cols-1 gap-4">
                                 {recentAwards.map(award => {
                                     const badge = award.company_badges;
                                     const recipient = award.recipient;
                                     const awarder = award.awarder;
                                     if (!badge || !recipient) return null;
-                                    
+
                                     const isUrl = badge.icon.startsWith('http://') || badge.icon.startsWith('https://');
-                                    
+
                                     return (
-                                        <div 
+                                        <div
                                             key={award.id}
                                             className="flex flex-col md:flex-row items-center gap-5 p-5 bg-white/95 dark:bg-slate-900/95 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800/80 relative overflow-hidden"
                                         >
@@ -1182,11 +1142,11 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, employees, currentUser 
                                                 <h5 className="text-base font-black text-slate-850 dark:text-white leading-tight">
                                                     {recipient.full_name} recebeu o selo "{badge.name}"!
                                                 </h5>
-                                                
+
                                                 <p className="text-xs text-slate-650 dark:text-slate-350 italic line-clamp-2 bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-100/50 dark:border-slate-750/50 font-medium">
                                                     "{award.reason}"
                                                 </p>
-                                                
+
                                                 <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 dark:text-slate-500">
                                                     <span>Concedido por {awarder?.full_name || 'Administrador'}</span>
                                                     <span>•</span>

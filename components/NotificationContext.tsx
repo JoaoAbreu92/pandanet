@@ -61,21 +61,201 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const audioCacheRef = useRef<Record<string, HTMLAudioElement>>({});
 
     // Module explicit counts
-    const [moduleUnreadCounts, setModuleUnreadCountsState] = useState<Record<string, number>>({});
-    
+    const [moduleUnreadCounts, setModuleUnreadCountsState] =
+        useState<Record<string, number>>({});
+
+    const moduleCountsChannelRef =
+        useRef<BroadcastChannel | null>(null);
+
+    const moduleCountsStorageKey = currentUser?.id
+        ? `pandanet_module_counts_${currentUser.id}`
+        : '';
+
+    const applyModuleUnreadCount = useCallback((
+        module: string,
+        count: number
+    ) => {
+        const safeCount = Math.max(
+            0,
+            Number.isFinite(count)
+                ? Math.floor(count)
+                : 0
+        );
+
+        setModuleUnreadCountsState(previous => {
+            if (previous[module] === safeCount) {
+                return previous;
+            }
+
+            return {
+                ...previous,
+                [module]: safeCount
+            };
+        });
+    }, []);
+
+    useEffect(() => {
+        if (!currentUser?.id) {
+            setModuleUnreadCountsState({});
+            return;
+        }
+
+        try {
+            const storedValue =
+                localStorage.getItem(moduleCountsStorageKey);
+
+            if (storedValue) {
+                const storedCounts = JSON.parse(storedValue);
+
+                if (
+                    storedCounts
+                    && typeof storedCounts === 'object'
+                    && !Array.isArray(storedCounts)
+                ) {
+                    setModuleUnreadCountsState(storedCounts);
+                }
+            }
+        } catch (error) {
+            console.warn(
+                '[Notifications] Contadores armazenados inválidos:',
+                error
+            );
+        }
+
+        const browserWindow: Window = globalThis.window;
+
+        if ('BroadcastChannel' in window) {
+            const channel = new BroadcastChannel(
+                `pandanet-module-counts-${currentUser.id}`
+            );
+
+            channel.onmessage = event => {
+                const message = event.data;
+
+                if (
+                    message?.type === 'MODULE_COUNT'
+                    && typeof message.module === 'string'
+                    && typeof message.count === 'number'
+                ) {
+                    applyModuleUnreadCount(
+                        message.module,
+                        message.count
+                    );
+                }
+            };
+
+            moduleCountsChannelRef.current = channel;
+
+            return () => {
+                channel.close();
+
+                if (
+                    moduleCountsChannelRef.current === channel
+                ) {
+                    moduleCountsChannelRef.current = null;
+                }
+            };
+        }
+
+        const handleStorage = (event: StorageEvent) => {
+            if (
+                event.key !== moduleCountsStorageKey
+                || !event.newValue
+            ) {
+                return;
+            }
+
+            try {
+                const counts = JSON.parse(event.newValue);
+
+                if (
+                    counts
+                    && typeof counts === 'object'
+                    && !Array.isArray(counts)
+                ) {
+                    setModuleUnreadCountsState(counts);
+                }
+            } catch {
+                // Valor inválido ignorado.
+            }
+        };
+
+        browserWindow.addEventListener(
+            'storage',
+            handleStorage
+        );
+
+        return () => {
+            browserWindow.removeEventListener(
+                'storage',
+                handleStorage
+            );
+        };
+    }, [
+        applyModuleUnreadCount,
+        currentUser?.id,
+        moduleCountsStorageKey
+    ]);
+
+    const setModuleUnreadCount = useCallback((
+        module: string,
+        count: number
+    ) => {
+        const safeCount = Math.max(
+            0,
+            Number.isFinite(count)
+                ? Math.floor(count)
+                : 0
+        );
+
+        applyModuleUnreadCount(module, safeCount);
+
+        moduleCountsChannelRef.current?.postMessage({
+            type: 'MODULE_COUNT',
+            module,
+            count: safeCount,
+            sentAt: Date.now()
+        });
+
+        if (moduleCountsStorageKey) {
+            try {
+                const previousValue =
+                    localStorage.getItem(
+                        moduleCountsStorageKey
+                    );
+
+                const previousCounts = previousValue
+                    ? JSON.parse(previousValue)
+                    : {};
+
+                localStorage.setItem(
+                    moduleCountsStorageKey,
+                    JSON.stringify({
+                        ...previousCounts,
+                        [module]: safeCount
+                    })
+                );
+            } catch (error) {
+                console.warn(
+                    '[Notifications] Falha ao persistir badge:',
+                    error
+                );
+            }
+        }
+    }, [
+        applyModuleUnreadCount,
+        moduleCountsStorageKey
+    ]);
+
     // Page tracking state
-    const [currentPage, setCurrentPage] = useState<string>('home');
+    const [currentPage, setCurrentPage] =
+        useState<string>('home');
+
     const currentPageRef = useRef(currentPage);
+
     useEffect(() => {
         currentPageRef.current = currentPage;
     }, [currentPage]);
-
-    const setModuleUnreadCount = useCallback((module: string, count: number) => {
-        setModuleUnreadCountsState(prev => {
-            if (prev[module] === count) return prev;
-            return { ...prev, [module]: count };
-        });
-    }, []);
 
     // Sound Customization
     const [selectedSound, setSelectedSound] = useState<string>(() => localStorage.getItem('pixel_notification_sound') || 'synth');
@@ -261,74 +441,171 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setTimeout(() => playNotificationSound('message', soundId), 100);
     };
 
-    const flashPageTitle = useCallback((message: string) => {
-        const originalTitle = 'grupopixel.com.br';
-        let showMessage = true;
+    const titleFlashCleanupRef =
+        useRef<(() => void) | null>(null);
 
-        const interval = setInterval(() => {
-            document.title = showMessage ? message : originalTitle;
+    const desktopNotificationsRef =
+        useRef<Set<globalThis.Notification>>(new Set());
+
+    const flashPageTitle = useCallback((
+        message: string
+    ) => {
+        titleFlashCleanupRef.current?.();
+
+        const originalTitle = document.title;
+        let showMessage = true;
+        let stopped = false;
+
+        const stopFlashing = () => {
+            if (stopped) return;
+
+            stopped = true;
+            window.clearInterval(interval);
+            window.clearTimeout(timeout);
+            document.title = originalTitle;
+
+            window.removeEventListener(
+                'focus',
+                stopFlashing
+            );
+
+            document.removeEventListener(
+                'visibilitychange',
+                handleVisibility
+            );
+
+            titleFlashCleanupRef.current = null;
+        };
+
+        const handleVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                stopFlashing();
+            }
+        };
+
+        const interval = window.setInterval(() => {
+            document.title = showMessage
+                ? message
+                : originalTitle;
+
             showMessage = !showMessage;
         }, 1200);
 
-        const stopFlashing = () => {
-            clearInterval(interval);
-            document.title = originalTitle;
-            window.removeEventListener('focus', stopFlashing);
-            window.removeEventListener('click', stopFlashing);
-        };
+        const timeout = window.setTimeout(
+            stopFlashing,
+            30000
+        );
 
-        window.addEventListener('focus', stopFlashing);
-        window.addEventListener('click', stopFlashing);
-        
-        setTimeout(stopFlashing, 30000); // Para após 30 segundos sozinho
+        titleFlashCleanupRef.current = stopFlashing;
+
+        window.addEventListener(
+            'focus',
+            stopFlashing
+        );
+
+        document.addEventListener(
+            'visibilitychange',
+            handleVisibility
+        );
     }, []);
 
-    const showDesktopNotification = useCallback((title: string, body: string, icon?: string) => {
+    const showDesktopNotification = useCallback((
+        title: string,
+        body: string,
+        icon?: string
+    ) => {
         if (!('Notification' in window)) {
-            console.warn('[PandaNet] Browser does not support desktop notifications.');
+            console.warn(
+                '[PandaNet] Navegador sem suporte a notificações.'
+            );
             return;
         }
 
-        const options = {
-            body,
-            icon: icon || '/logo.png',
-            badge: '/logo.png',
-            tag: 'pandanet-notification',
-            requireInteraction: false,
-            silent: false
-        };
+        if (Notification.permission !== 'granted') {
+            console.info(
+                '[PandaNet] Notificação desktop não exibida: permissão não concedida.'
+            );
+            return;
+        }
 
-        if (Notification.permission === 'granted') {
-            try {
-                const notification = new Notification(title, options);
-                notification.onclick = () => {
-                    window.focus();
-                    notification.close();
-                };
-                // Auto-fechar após 5 segundos
-                setTimeout(() => notification.close(), 5000);
-            } catch (error) {
-                console.error('[PandaNet] Erro ao criar notificação:', error);
-            }
-        } else if (Notification.permission === 'default') {
-            // Solicitar permissão (necessário para Chrome)
-            Notification.requestPermission().then(permission => {
-                if (permission === 'granted') {
+        if (
+            document.visibilityState === 'visible'
+            && document.hasFocus()
+        ) {
+            return;
+        }
+
+        try {
+            const notificationTag = [
+                'pandanet',
+                title,
+                body
+            ]
+                .join(':')
+                .toLowerCase()
+                .replace(/[^a-z0-9:_-]+/g, '-')
+                .slice(0, 180);
+
+            const notification =
+                new globalThis.Notification(
+                    title,
+                    {
+                        body,
+                        icon: icon || '/logo.png',
+                        badge: '/logo.png',
+                        tag: notificationTag,
+                        requireInteraction: false,
+                        silent: true
+                    }
+                );
+
+            desktopNotificationsRef.current.add(
+                notification
+            );
+
+            const closeNotification = () => {
+                desktopNotificationsRef.current.delete(
+                    notification
+                );
+            };
+
+            notification.onclick = () => {
+                window.focus();
+                notification.close();
+                closeNotification();
+            };
+
+            notification.onclose = closeNotification;
+            notification.onerror = closeNotification;
+
+            window.setTimeout(() => {
+                notification.close();
+                closeNotification();
+            }, 8000);
+        } catch (error) {
+            console.error(
+                '[PandaNet] Erro ao criar notificação desktop:',
+                error
+            );
+        }
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            titleFlashCleanupRef.current?.();
+
+            desktopNotificationsRef.current.forEach(
+                notification => {
                     try {
-                        const notification = new Notification(title, options);
-                        notification.onclick = () => {
-                            window.focus();
-                            notification.close();
-                        };
-                        setTimeout(() => notification.close(), 5000);
-                    } catch (error) {
-                        console.error('[PandaNet] Erro ao criar notificação após permissão:', error);
+                        notification.close();
+                    } catch {
+                        // Notificação já encerrada.
                     }
                 }
-            }).catch(error => {
-                console.error('[PandaNet] Erro ao solicitar permissão:', error);
-            });
-        }
+            );
+
+            desktopNotificationsRef.current.clear();
+        };
     }, []);
 
     const fetchNotifications = useCallback(async () => {
@@ -510,6 +787,15 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }
 
         try {
+            await PushNotifications
+                .removeAllListeners()
+                .catch(error => {
+                    console.warn(
+                        '[PandaNet] Não foi possível limpar listeners push anteriores:',
+                        error
+                    );
+                });
+
             console.log('[PandaNet] Iniciando registro do Push FCM...');
             let permStatus = await PushNotifications.checkPermissions();
 
@@ -594,6 +880,70 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }
     }, []);
 
+    const runAlertOnceAcrossTabs = useCallback((
+        eventId: string,
+        callback: () => void | Promise<void>
+    ) => {
+        const execute = async () => {
+            const lockManager = (navigator as any).locks;
+
+            if (lockManager) {
+                await lockManager.request(
+                    `pandanet-alert-${eventId}`,
+                    {
+                        ifAvailable: true,
+                        mode: 'exclusive'
+                    },
+                    async (lock: unknown | null) => {
+                        if (lock) {
+                            await callback();
+                        }
+                    }
+                );
+
+                return;
+            }
+
+            const claimKey =
+                `pandanet_alert_claim_${eventId}`;
+
+            const now = Date.now();
+
+            try {
+                const previousClaim = Number(
+                    localStorage.getItem(claimKey) || 0
+                );
+
+                if (
+                    previousClaim
+                    && now - previousClaim < 60000
+                ) {
+                    return;
+                }
+
+                localStorage.setItem(
+                    claimKey,
+                    String(now)
+                );
+
+                window.setTimeout(() => {
+                    try {
+                        localStorage.removeItem(claimKey);
+                    } catch {
+                        // A expiração evita bloqueio permanente.
+                    }
+                }, 60000);
+            } catch {
+                // Mantém o alerta funcional se o armazenamento
+                // do navegador estiver indisponível.
+            }
+
+            await callback();
+        };
+
+        void execute();
+    }, []);
+
     useEffect(() => {
         fetchNotifications();
 
@@ -621,8 +971,20 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                         console.log('Aviso: Notificação pertence a este usuário. Atualizando...');
 
                         if (payload.eventType === 'INSERT') {
-                            playNotificationSound(newNotif.type as NotificationType);
-                            showDesktopNotification(newNotif.title, newNotif.description, newNotif.avatar_url);
+                            runAlertOnceAcrossTabs(
+                                `notification-${newNotif.id}`,
+                                () => {
+                                    playNotificationSound(
+                                        newNotif.type as NotificationType
+                                    );
+
+                                    showDesktopNotification(
+                                        newNotif.title,
+                                        newNotif.description,
+                                        newNotif.avatar_url
+                                    );
+                                }
+                            );
                         }
 
                         fetchNotifications();
@@ -761,10 +1123,48 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 supabase.removeChannel(channel);
                 supabase.removeChannel(messagesChannel);
                 if (whatsappChannel) supabase.removeChannel(whatsappChannel);
-                if (whatsappMessagesChannel) supabase.removeChannel(whatsappMessagesChannel);
+                if (whatsappMessagesChannel) {
+                    supabase.removeChannel(
+                        whatsappMessagesChannel
+                    );
+                }
+
+                if (Capacitor.isNativePlatform()) {
+                    void PushNotifications
+                        .removeAllListeners()
+                        .catch(error => {
+                            console.warn(
+                                '[PandaNet] Falha ao remover listeners push:',
+                                error
+                            );
+                        });
+                }
+
+                titleFlashCleanupRef.current?.();
+
+                desktopNotificationsRef.current.forEach(
+                    notification => {
+                        try {
+                            notification.close();
+                        } catch {
+                            // Notificação já encerrada.
+                        }
+                    }
+                );
+
+                desktopNotificationsRef.current.clear();
             };
         }
-    }, [currentUser?.id, currentUser?.company_id, fetchNotifications, playNotificationSound, showDesktopNotification, flashPageTitle]);
+    }, [
+        currentUser?.id,
+        currentUser?.company_id,
+        fetchNotifications,
+        playNotificationSound,
+        showDesktopNotification,
+        flashPageTitle,
+        registerPushNotifications,
+        runAlertOnceAcrossTabs
+    ]);
 
     const markAsRead = async (id: string) => {
         if (isGhostMode) return; // Ghost mode blocks marking as read

@@ -16,7 +16,7 @@ export const translations = {
         'sidebar.feed': 'Feed Social',
         'sidebar.messages': 'Mensagens',
         'sidebar.inbox': 'Caixa de Entrada',
-        'sidebar.calendar': 'Calendário',
+        'sidebar.calendar': 'Agenda',
         'sidebar.marketplace': 'Marketplace',
         'sidebar.wellbeing': 'Bem-Estar',
         'sidebar.directory': 'Diretório',

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from './LanguageContext';
+import { useEmailLiveSync } from './useEmailLiveSync';
 import { useNotifications } from './NotificationContext';
 import { useAuth } from './AuthContext';
 import { supabase } from '../supabaseClient';
@@ -28,6 +29,8 @@ import {
     PaperClipIcon, ArrowDownTrayIcon,
     Bars3Icon, ChevronDownIcon, ChevronRightIcon, CheckIcon,
     UserGroupIcon
+,
+    EnvelopeOpenIcon
 } from '@heroicons/react/24/outline'; // Assuming you have these or similar icons from your icon set
 import { useToast } from './ToastContext';
 import ConfirmModal from './ui/ConfirmModal';
@@ -92,9 +95,9 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     const { setModuleUnreadCount, notifications, markAsRead, markNotificationsByLink } = useNotifications();
     const { isGhostMode, realProfile } = useAuth();
 
-    const canManageAccounts = currentUser?.email_permissions?.can_manage_accounts || 
-                            currentUser?.isAdmin || 
-                            currentUser?.isCompanyAdmin || 
+    const canManageAccounts = currentUser?.email_permissions?.can_manage_accounts ||
+                            currentUser?.isAdmin ||
+                            currentUser?.isCompanyAdmin ||
                             currentUser?.email === 'ti@grupopixel.com.br';
 
     // --- State: Confirm Modal ---
@@ -239,29 +242,29 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
         const newVal = e.target.checked;
         setAllowUsersMultipleEmails(newVal);
-        
+
         try {
             const { data: company } = await supabase
                 .from('companies')
                 .select('custom_features')
                 .eq('id', currentUser.company_id)
                 .maybeSingle();
-                
+
             const currentFeatures = company?.custom_features || {};
             const updatedFeatures = {
                 ...currentFeatures,
                 allow_users_multiple_emails: newVal
             };
-            
+
             const { error } = await supabase
                 .from('companies')
                 .update({ custom_features: updatedFeatures })
                 .eq('id', currentUser.company_id);
-                
+
             if (error) throw error;
-            
+
             showToast(newVal ? 'Múltiplos e-mails permitidos para usuários comum.' : 'Múltiplos e-mails desativados para usuários comum.', 'success');
-            
+
             if (currentUser.company) {
                 currentUser.company.custom_features = updatedFeatures;
             }
@@ -275,7 +278,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     const [currentFolder, setCurrentFolder] = useState('INBOX');
     const [showFolderModal, setShowFolderModal] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
-    
+
     // --- State: Tags ---
     const [availableTags, setAvailableTags] = useState<{ id: string, label: string, color: string }[]>([]);
     const [showTagModal, setShowTagModal] = useState(false);
@@ -289,7 +292,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         const activeConfig = configOverride || settings;
         const imapUser = activeConfig?.imap_user || 'no_user';
         const currentUserId = currentUser?.id || 'unknown';
-        return `${currentUserId}_${imapUser}_${folderName}_${pageNum}`;
+        return JSON.stringify([currentUserId, activeAccountId, activeConfig.imap_host,
+            activeConfig.imap_port, imapUser, folderName, pageNum, pageSize]);
     };
     const [pageSize, setPageSize] = useState(10); // User requested 10
     const [totalEmails, setTotalEmails] = useState(0);
@@ -300,6 +304,19 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     const [filterTag, setFilterTag] = useState<string | null>(null);
 
     const fetchInProgress = useRef(false);
+    const bodyRequests = useRef(new Set<string>());
+    const bodyCache = useRef(new Map<string, { data: any; expires: number }>());
+    const activeBody = useRef('');
+    const mailboxScope = JSON.stringify([currentUser?.id, activeAccountId,
+        settings.imap_host, settings.imap_port, settings.imap_user, currentFolder,
+        page, pageSize, searchQuery, filterTag]);
+    const latestMailboxScope = useRef(mailboxScope);
+    latestMailboxScope.current = mailboxScope;
+    useEffect(() => {
+        bodyCache.current.clear();
+        activeBody.current = '';
+        return () => { bodyCache.current.clear(); activeBody.current = ''; };
+    }, [currentUser?.id, activeAccountId]);
 
     // --- State: Compose ---
     const [composeTo, setComposeTo] = useState('');
@@ -407,7 +424,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     // Carregar notificações desabilitadas do localStorage e registrar listener de clique global
     useEffect(() => {
         if (!currentUser?.id) return;
-        
+
         const saved = localStorage.getItem(`panda_email_disabled_notifications_${currentUser.id}`);
         if (saved) {
             try {
@@ -429,17 +446,17 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
     // Fetch body for restored email only after settings are loaded
     useEffect(() => {
-        if (savedImapUser && view === 'read' && selectedEmail && !selectedEmail.html && !selectedEmail.text) {
+        if (savedImapUser && view === 'read' && selectedEmail && !(selectedEmail as any).bodyLoaded && !selectedEmail.html && !selectedEmail.text) {
             fetchEmailBody(selectedEmail.uid, selectedEmail.folder || currentFolder || 'INBOX');
         }
     }, [savedImapUser, view, selectedEmail]);
 
     const refreshAllAccountBadges = async () => {
         if (!accounts || accounts.length === 0) return;
-        
+
         console.log("[EmailPage] Refreshing all account badges...");
         const newCounts: Record<string, number> = {};
-        
+
         // Use Promise.all to fetch counts in parallel
         await Promise.all(accounts.map(async (acc) => {
             try {
@@ -454,9 +471,9 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                 console.error(`[EmailPage] Error fetching status for account ${acc.imap_user}:`, err);
             }
         }));
-        
+
         setAccountUnseenCounts(newCounts);
-        
+
         // Also update main unseenCount if the active account is among them
         if (activeAccountId && newCounts[activeAccountId] !== undefined) {
             setUnseenCount(newCounts[activeAccountId]);
@@ -468,16 +485,10 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         // Initial badge refresh
         if (accounts.length > 0) refreshAllAccountBadges();
 
-        const badgeInterval = setInterval(refreshAllAccountBadges, 300000); // Every minute
-        const activeAccountInterval = setInterval(() => {
-            if (activeAccountId && view === 'inbox' && !loading) {
-                fetchEmails(false);
-            }
-        }, 30000); // Every 30s for active account
+        const badgeInterval = setInterval(refreshAllAccountBadges, 300000);
 
         return () => {
             clearInterval(badgeInterval);
-            clearInterval(activeAccountInterval);
         };
     }, [accounts.length, activeAccountId, view]);
 
@@ -564,7 +575,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             // @ts-ignore
             if (pollingRef.current) clearInterval(pollingRef.current);
             // @ts-ignore - Bypass Deno vs Browser typing on setInterval
-            pollingRef.current = setInterval(() => fetchEmails(true), 300000);
+            pollingRef.current = null; // Automatic list refresh is owned by useEmailLiveSync.
             fetchTags();    // Load tags once
             fetchContacts(); // Load contacts once
             fetchContactGroups(); // Load contact groups
@@ -575,14 +586,14 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
     const fetchAccounts = async () => {
         if (!currentUser?.company_id) return;
-        
+
         let query = supabase.from('email_settings').select('*').eq('company_id', currentUser.company_id);
-        
+
         const perms = currentUser.email_permissions;
         const isSuperOrMaster = currentUser.role === 'Super Admin' || currentUser.email === 'ti@grupopixel.com.br';
         const isAdmin = currentUser?.isAdmin || currentUser?.isCompanyAdmin || isSuperOrMaster;
         const canViewAll = isSuperOrMaster || perms?.can_view_all_accounts === true || (isAdmin && viewAllCompanyEmails);
-        
+
         if (!canViewAll) {
             if (perms?.allowed_accounts && perms.allowed_accounts.length > 0) {
                 query = query.or(`user_id.eq.${currentUser.id},id.in.(${perms.allowed_accounts.join(',')})`);
@@ -592,7 +603,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         }
 
         const { data, error } = await query;
-        
+
         if (data && !error) {
             setAccounts(data);
             if (data.length > 0) {
@@ -626,7 +637,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
     const saveSettings = async () => {
         if (!currentUser?.company_id) return;
-        
+
         // Verificação de limite individual ou do plano
         if (!activeAccountId) {
             const myOwnedAccounts = accounts.filter(a => a.user_id === currentUser.id);
@@ -644,21 +655,21 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                 return;
             }
         }
-        
+
         const safeSettings = {
             ...settings,
             smtp_user: (settings.smtp_user && settings.smtp_user.trim()) ? settings.smtp_user.trim() : settings.imap_user,
             smtp_pass: (settings.smtp_pass && settings.smtp_pass.trim()) ? settings.smtp_pass.trim() : settings.imap_pass
         };
-        const payload = { 
-            id: activeAccountId || undefined, 
+        const payload = {
+            id: activeAccountId || undefined,
             company_id: currentUser.company_id,
-            user_id: currentUser.id, 
-            ...safeSettings 
+            user_id: currentUser.id,
+            ...safeSettings
         };
-        
+
         const { data, error } = await supabase.from('email_settings').upsert(payload).select();
-        
+
         if (error) {
             showToast('Erro ao salvar as configurações: ' + error.message, 'error');
         } else {
@@ -686,7 +697,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         if (!isOwner) {
             const perms = currentUser.email_permissions || {};
             const allowed = perms.allowed_accounts || [];
-            
+
             if (allowed.includes(accountId)) {
                 openConfirm(
                     'Remover Acesso Compartilhado',
@@ -695,11 +706,11 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                         closeConfirm();
                         const newAllowed = allowed.filter((id: string) => id !== accountId);
                         const newPerms = { ...perms, allowed_accounts: newAllowed };
-                        
+
                         const { error } = await supabase.from('profiles')
                             .update({ email_permissions: newPerms })
                             .eq('id', currentUser.id);
-                            
+
                         if (error) {
                             showToast('Erro ao remover acesso compartilhado: ' + error.message, 'error');
                         } else {
@@ -777,6 +788,9 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     const callEmailServer = async (action: string, body: any) => {
         const session = await supabase.auth.getSession();
         const token = session.data.session?.access_token;
+        const readOnly = ['fetch', 'search', 'fetch-body', 'fetch-by-ids', 'status'].includes(action);
+        const controller = new AbortController();
+        const timer = readOnly ? setTimeout(() => controller.abort(), 45000) : undefined;
         try {
             const response = await fetch(`${EMAIL_SERVER_URL}/${action}`, {
                 method: 'POST',
@@ -784,32 +798,99 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(body)
+                body: JSON.stringify(body),
+                signal: controller.signal
             });
             const data = await response.json();
             if (!response.ok) return { data: null, error: { message: data.error || 'Servidor de email indisponível' } };
             return { data, error: null };
         } catch (err: any) {
-            return { data: null, error: { message: err.message || 'Falha ao conectar ao servidor de email' } };
+            return { data: null, error: { message: err.name === 'AbortError'
+                ? 'O servidor demorou para responder. Tente novamente.'
+                : err.message || 'Falha ao conectar ao servidor de email' } };
+        } finally {
+            if (timer) clearTimeout(timer);
         }
     };
 
     const fetchEmailBody = async (uid: string, folder: string) => {
         if (!settings.imap_host) return;
 
+        const scope = mailboxScope;
+        const key = JSON.stringify([currentUser.id, activeAccountId, settings.imap_host,
+            settings.imap_port, settings.imap_user, folder, String(uid)]);
+        activeBody.current = key;
+        if (bodyRequests.current.has(key)) return;
+        bodyRequests.current.add(key);
+
         setLoadingBody(true);
         setBodyError(null);
         try {
-            const { data, error } = await callEmailServer('fetch-body', {
+            const cachedBody = bodyCache.current.get(key);
+            const knownEmail = emails.find(e => String(e.uid) === String(uid));
+            const canUseCache = cachedBody && cachedBody.expires > Date.now() &&
+                knownEmail?.flags?.includes('\\Seen');
+            const { data, error } = canUseCache
+                ? { data: cachedBody.data, error: null }
+                : await callEmailServer('fetch-body', {
                 config: settings,
                 uid,
                 path: folder
             });
             if (error) throw error;
             if (data.error) throw new Error(data.error);
+            if (activeBody.current !== key || latestMailboxScope.current !== scope) return;
+            // Memory only, short lived, bounded; no message body is added to persistent storage.
+            if (JSON.stringify(data).length < 500000) {
+                bodyCache.current.delete(key);
+                bodyCache.current.set(key, { data, expires: Date.now() + 120000 });
+                while (bodyCache.current.size > 12) {
+                    bodyCache.current.delete(bodyCache.current.keys().next().value!);
+                }
+            }
 
             // Update local emails list with the body
-            setEmails(prev => prev.map(e => e.uid === uid ? { ...e, text: data.text, html: data.html, attachments: data.attachments, cc: data.cc } : e));
+            setEmails(prev => prev.map(e => {
+                if (String(e.uid) !== String(uid)) return e;
+
+                const flags = Array.from(
+                    new Set([
+                        ...(e.flags || []),
+                        ...(data.flags || []),
+                        '\\Seen'
+                    ])
+                );
+
+                return {
+                    ...e,
+                    text: data.text,
+                    html: data.html,
+                    attachments: data.attachments,
+                    cc: data.cc,
+                    flags,
+                    bodyLoaded: true
+                };
+            }));
+
+            setLocallySeenUids(prev => {
+                const next = new Set(prev);
+                next.add(uid);
+                return next;
+            });
+
+            setUnseenCount(prev => {
+                const email = emails.find(item =>
+                    item.uid === uid
+                );
+
+                const wasUnread =
+                    email &&
+                    !(email.flags || []).includes('\\Seen');
+
+                return wasUnread
+                    ? Math.max(0, prev - 1)
+                    : prev;
+            });
 
             // Mark local real-state emails as seen
             if (!isGhostMode) {
@@ -829,18 +910,19 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
             // Update selected e-mail
             setSelectedEmail(prev => {
-                if (!prev || prev.uid !== uid) return prev;
+                if (!prev || String(prev.uid) !== String(uid) || (prev.folder && prev.folder !== folder)) return prev;
                 const flags = prev.flags || [];
                 return {
                     ...prev,
+                    bodyLoaded: true,
                     text: data.text,
-                    html: data.html, 
+                    html: data.html,
                     attachments: data.attachments,
                     cc: data.cc,
                     subject: prev.subject === 'Carregando e-mail...' ? (data.subject || prev.subject) : prev.subject,
                     from: !prev.from || prev.from === '' ? (data.from || prev.from) : prev.from,
                     date: !prev.date || prev.date === '' ? (data.date || prev.date) : prev.date,
-                    flags: (!isGhostMode && !flags.includes('\\Seen')) ? [...flags, '\\Seen'] : flags 
+                    flags: (!isGhostMode && !flags.includes('\\Seen')) ? [...flags, '\\Seen'] : flags
                 };
             });
 
@@ -858,14 +940,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
             // Background update Seen flag on server if not seen
             if (!isGhostMode) {
-                callEmailServer('flags', {
-                    config: settings,
-                    uids: [uid],
-                    operation: 'add',
-                    flags: ['\\Seen'],
-                    path: folder
-                }).catch(e => console.error("Error setting Seen flag:", e));
-                
+                // fetch-body already confirms the Seen flag on the IMAP server.
+
                 // Also clean notification
                 markNotificationsByLink(`/email?uid=${uid}`);
                 if (activeAccountId) {
@@ -874,18 +950,11 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             }
         } catch (err: any) {
             console.error("Fetch Body Error:", err);
-            setBodyError(err.message || "Falha ao carregar conteúdo do e-mail.");
+            if (activeBody.current === key && latestMailboxScope.current === scope)
+                setBodyError(err.message || "Falha ao carregar conteúdo do e-mail.");
         } finally {
-            setLoadingBody(false);
-            // Mark global notification as read if it looks like an email notification
-            if (currentUser?.id && !isGhostMode) {
-                supabase.from('notifications')
-                    .update({ is_read: true })
-                    .eq('user_id', currentUser.id)
-                    .eq('is_read', false)
-                    .or(`link.eq./email,link.eq./email?uid=${uid}`)
-                    .then(() => { });
-            }
+            bodyRequests.current.delete(key);
+            if (activeBody.current === key) setLoadingBody(false);
         }
     };
 
@@ -992,28 +1061,122 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
     const markAllAsRead = async () => {
         if (isGhostMode) {
-            showToast("Modo Auditoria: Não é possível marcar como lido.", "warning");
+            showToast(
+                'Modo Auditoria: Não é possível marcar como lido.',
+                'warning'
+            );
             return;
         }
-        const unreadEmails = emails.filter(e => !(e.flags || []).includes('\\Seen'));
-        if (unreadEmails.length === 0) return;
 
-        // Optimistic UI Update
-        setEmails(prev => prev.map(e => ({ ...e, flags: [...(e.flags || []), '\\Seen'] })));
-        setUnseenCount(0);
+        const unreadEmails = emails.filter(email =>
+            !(email.flags || []).includes('\\Seen')
+        );
 
-        // Call Server for each or batch if supported. The /flags API supports multiple UIDs.
-        await callEmailServer('flags', {
-            config: settings,
-            uids: unreadEmails.map(e => e.uid),
-            operation: 'add',
-            flags: ['\\Seen'],
-            path: currentFolder
+        if (unreadEmails.length === 0) {
+            showToast(
+                'Todas as mensagens já estão lidas.',
+                'info'
+            );
+            return;
+        }
+
+        const previousEmails = emails;
+        const previousUnseenCount = unseenCount;
+        const unreadUids = unreadEmails.map(email =>
+            email.uid
+        );
+
+        setEmails(prev => prev.map(email => ({
+            ...email,
+            flags: Array.from(
+                new Set([
+                    ...(email.flags || []),
+                    '\\Seen'
+                ])
+            )
+        })));
+
+        setUnseenCount(prev =>
+            Math.max(0, prev - unreadEmails.length)
+        );
+
+        setLocallySeenUids(prev => {
+            const next = new Set(prev);
+
+            for (const uid of unreadUids) {
+                next.add(uid);
+            }
+
+            return next;
         });
 
-        // Invalidate cache
-        const cacheKey = getCacheKey(currentFolder, page);
-        delete emailCache[cacheKey];
+        try {
+            const { data, error } = await callEmailServer(
+                'flags',
+                {
+                    config: settings,
+                    uids: unreadUids,
+                    operation: 'add',
+                    flags: ['\\Seen'],
+                    path: currentFolder
+                }
+            );
+
+            if (error) {
+                throw error;
+            }
+
+            if (!data?.success) {
+                throw new Error(
+                    data?.error ||
+                    'O servidor não confirmou a alteração.'
+                );
+            }
+
+            const cacheKey = getCacheKey(
+                currentFolder,
+                page
+            );
+
+            delete emailCache[cacheKey];
+
+            await Promise.allSettled(
+                unreadEmails.map(email =>
+                    markNotificationsByLink(
+                        `/email?uid=${email.uid}`
+                    )
+                )
+            );
+
+            showToast(
+                `${unreadEmails.length} mensagem(ns) marcada(s) como lida(s).`,
+                'success'
+            );
+        } catch (error) {
+            console.error(
+                '[EmailPage] Falha ao marcar todas como lidas:',
+                error
+            );
+
+            setEmails(previousEmails);
+            setUnseenCount(previousUnseenCount);
+
+            setLocallySeenUids(prev => {
+                const next = new Set(prev);
+
+                for (const uid of unreadUids) {
+                    next.delete(uid);
+                }
+
+                return next;
+            });
+
+            showToast(
+                error?.message ||
+                'Não foi possível persistir a leitura. Tente novamente.',
+                'error'
+            );
+        }
     };
 
     const createFolder = async () => {
@@ -1043,7 +1206,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             setFolders(data);
         } else {
             console.error("Falha ao buscar pastas:", error);
-            // Silent fail for UI mostly, but log it. 
+            // Silent fail for UI mostly, but log it.
             // If it's 404, it means backend is old.
             if (error?.message?.includes('404') || error?.message?.includes('Cannot POST')) {
                 showToast("Aviso: As pastas não carregaram. O servidor de e-mail parece desatualizado. Por favor, reinicie o backend (server).", "warning");
@@ -1204,6 +1367,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         const activeConfig = configOverride || settings;
         if (!activeConfig.imap_user || fetchInProgress.current) return;
         fetchInProgress.current = true;
+        const requestScope = mailboxScope;
 
         try {
             const currentUserId = currentUser?.id || 'unknown';
@@ -1239,7 +1403,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                 }
 
                 const { data, error } = await callEmailServer('fetch-by-ids', { config: activeConfig, messageIds: taggedIds });
-                
+                if (latestMailboxScope.current !== requestScope) return;
+
                 if (error) {
                     if (error.message?.includes('429')) console.warn("[EmailPage] Rate limit hit (429).");
                     throw error;
@@ -1261,7 +1426,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                         metadata: meta ? { id: meta.id, tags: meta.tags || [], notes: meta.notes } : { tags: [] }
                     };
                 });
-                
+
                 setEmails(mergedEmails);
                 setTotalEmails(mergedEmails.length);
                 fetchInProgress.current = false; // RELEASE LOCK!
@@ -1269,12 +1434,13 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             }
 
             const action = isSearchingGlobal ? 'search' : 'fetch';
-            const payload = isSearchingGlobal 
+            const payload = isSearchingGlobal
                 ? { config: activeConfig, query: searchQuery.trim() }
                 : { config: activeConfig, path: currentFolder, page, pageSize };
 
             const { data, error } = await callEmailServer(action, payload);
-            
+            if (latestMailboxScope.current !== requestScope) return;
+
             if (error) {
                 if (error.message?.includes('429')) {
                     console.warn("[EmailPage] Rate limit hit (429).");
@@ -1305,6 +1471,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             }
 
             // Merge metadata and override Seen status from local state
+            if (latestMailboxScope.current !== requestScope) return;
             const mergedEmails = emailList.map((email: any) => {
                 const meta = metadataList?.find((m: any) => m.message_id === (email.messageId || email.uid));
                 const isLocallySeen = locallySeenUids.has(email.uid);
@@ -1337,6 +1504,15 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
 
     // Refresh when page or folder changes
+    useEmailLiveSync({
+        userId: currentUser?.id,
+        accountId: activeAccountId,
+        scope: mailboxScope,
+        enabled: !!savedImapUser && (view === 'inbox' || view === 'read'),
+        refresh: () => fetchEmails(true, true),
+        busy: () => fetchInProgress.current || bodyRequests.current.size > 0,
+    });
+
     useEffect(() => {
         if (savedImapUser) fetchEmails();
     }, [page, pageSize, currentFolder, filterTag]);
@@ -1673,7 +1849,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
     const handleToggleTag = async (email: EmailMessage, label: string, color: string) => {
         const currentTags = email.metadata?.tags || [];
         const hasTag = currentTags.some(t => t.label === label);
-        
+
         let newTags;
         if (hasTag) {
             newTags = currentTags.filter(t => t.label !== label);
@@ -1690,7 +1866,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         if (!email.uid) return; // Should use Message-ID properly
 
         // Using UID as generic ID for now, but Message-ID is safer for IMAP
-        // The DB schema uses message_id. 
+        // The DB schema uses message_id.
         // Strategy: Upsert into email_metadata finding by (user_id, message_id)
         // For now let's hope the Edge Function returns 'messageId'
 
@@ -1716,7 +1892,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
             from.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesTag = filterTag ? (email.metadata?.tags || []).some(t => t.label?.toLowerCase() === filterTag?.toLowerCase()) : true;
-        
+
         let matchesDate = true;
         if (filterDateRange !== 'all') {
             const emailDate = new Date(email.date);
@@ -1751,7 +1927,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         <div className="flex flex-1 min-h-0 h-full bg-white/70 dark:bg-[#020617]/40 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden border border-gray-100 dark:border-white/5 transition-all duration-500 relative">
             {/* --- Mobile Sidebar Overlay --- */}
             {sidebarOpen && (
-                <div 
+                <div
                     className="fixed inset-0 bg-black/20 backdrop-blur-sm z-20 md:hidden transition-opacity"
                     onClick={() => setSidebarOpen(false)}
                 />
@@ -1816,13 +1992,13 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                         <div className="pl-4 pr-1 py-1 space-y-1 animate-in slide-in-from-top-1 duration-200">
                                             {/* Folder: INBOX */}
                                             <button
-                                                onClick={() => { 
-                                                    setView('inbox'); 
-                                                    setCurrentFolder('INBOX'); 
-                                                    setFilterTag(null); 
-                                                    setPage(1); 
+                                                onClick={() => {
+                                                    setView('inbox');
+                                                    setCurrentFolder('INBOX');
+                                                    setFilterTag(null);
+                                                    setPage(1);
                                                     if (window.innerWidth < 768) setSidebarOpen(false);
-                                                }} 
+                                                }}
                                                 onDragOver={handleDragOver}
                                                 onDrop={(e) => handleDrop(e, 'INBOX')}
                                                 className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-bold rounded-lg transition-all ${currentFolder === 'INBOX' && !filterTag ? 'bg-brand-primary text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white'}`}
@@ -1848,11 +2024,11 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                     return (
                                                         <button
                                                             key={folder.path}
-                                                            onClick={() => { 
-                                                                setView('inbox'); 
-                                                                setCurrentFolder(folder.path); 
-                                                                setFilterTag(null); 
-                                                                setPage(1); 
+                                                            onClick={() => {
+                                                                setView('inbox');
+                                                                setCurrentFolder(folder.path);
+                                                                setFilterTag(null);
+                                                                setPage(1);
                                                                 if (window.innerWidth < 768) setSidebarOpen(false);
                                                             }}
                                                             onDragOver={handleDragOver}
@@ -1864,7 +2040,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                         </button>
                                                     );
                                                 })}
-                                            
+
                                             {isActive && (
                                                 <button onClick={() => setShowFolderModal(true)} className="w-full text-left px-3 py-1.5 text-[10px] text-brand-primary hover:bg-gray-100 rounded-lg flex items-center gap-2 font-bold opacity-80">
                                                     + {t('email.new_folder')}
@@ -1889,12 +2065,12 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                             <p className="px-3 text-xs text-gray-400 italic">Nenhuma tag criada.</p>
                         )}
                         {availableTags.map(tag => (
-                            <button 
+                            <button
                                 key={tag.id}
-                                onClick={() => { 
-                                    setView('inbox'); 
-                                    setFilterTag(tag.label); 
-                                    setPage(1); 
+                                onClick={() => {
+                                    setView('inbox');
+                                    setFilterTag(tag.label);
+                                    setPage(1);
                                     if (window.innerWidth < 768) setSidebarOpen(false);
                                 }}
                                 className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md ${filterTag === tag.label ? 'bg-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
@@ -2080,7 +2256,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
             {/* --- Middle: Email List --- */}
             {(view === 'inbox' || view === 'read') && (
                 <div className={`flex flex-col h-full min-h-0 overflow-hidden min-w-0 border-r border-gray-200 relative ${
-                    openMode === 'split' 
+                    openMode === 'split'
                         ? ((view === 'read' && isFullScreen) ? 'hidden' : view === 'read' ? 'hidden md:flex md:max-w-md md:w-80' : 'flex-1 md:flex-none md:w-80 md:max-w-md')
                         : 'flex-1'
                 }`}>
@@ -2089,8 +2265,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 {!sidebarOpen && (
-                                    <button 
-                                        onClick={() => setSidebarOpen(true)} 
+                                    <button
+                                        onClick={() => setSidebarOpen(true)}
                                         className="md:hidden p-1.5 -ml-1 text-gray-400 hover:bg-gray-100 rounded-lg"
                                         title="Menu"
                                     >
@@ -2138,10 +2314,12 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                 ) : (
                                         <button
                                             onClick={markAllAsRead}
-                                            className="text-[10px] font-black text-brand-primary hover:text-emerald-500 uppercase tracking-widest transition-colors"
-                                            title="Marcar todos como lidos"
+                                            disabled={loading}
+                                            className="shrink-0 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/30 text-[9px] font-black text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wide whitespace-nowrap transition-all"
+                                            title="Marcar todas as mensagens desta página como lidas"
                                         >
-                                            Lidos
+                                            <EnvelopeOpenIcon className="w-3.5 h-3.5" />
+                                            Marcar todas como lidas
                                         </button>
                                 )}
                             </div>
@@ -2172,7 +2350,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                 <option value="from_asc">Remetente: A-Z</option>
                                 <option value="from_desc">Remetente: Z-A</option>
                             </select>
-                            
+
                             <select
                                 value={filterDateRange}
                                 onChange={e => setFilterDateRange(e.target.value as any)}
@@ -2317,7 +2495,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                             </div>
                             <div className="max-h-48 overflow-y-auto">
                                 {folders.map(f => (
-                                    <button 
+                                    <button
                                         key={f.path}
                                         disabled={f.path === currentFolder}
                                         onClick={() => { moveEmail([contextMenu.email.uid], f.path); closeContextMenu(); }}
@@ -2377,23 +2555,42 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                     )}
 
                     {/* Pagination Controls */}
-                    {view === 'inbox' && (
-                        <div className="p-4 border-t border-gray-100 dark:border-white/5 bg-white/50 dark:bg-slate-900/20 backdrop-blur-xl flex items-center justify-between">
+                    {(
+                        view === 'inbox' ||
+                        (
+                            view === 'read' &&
+                            openMode === 'split'
+                        )
+                    ) && (
+                        <div className="shrink-0 sticky bottom-0 z-20 p-3 border-t border-gray-200 dark:border-white/10 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl flex items-center justify-between gap-3 shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
                             <span className="text-xs text-gray-500">
-                                {t('email.page')} {page} {t('email.of')} {Math.ceil(totalEmails / pageSize) || 1}
+                                {t('email.page')} {Math.min(
+                                    page,
+                                    Math.max(
+                                        1,
+                                        Math.ceil(
+                                            totalEmails / pageSize
+                                        )
+                                    )
+                                )} {t('email.of')} {Math.max(
+                                    1,
+                                    Math.ceil(
+                                        totalEmails / pageSize
+                                    )
+                                )}
                             </span>
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => setPage(p => Math.max(1, p - 1))}
                                     disabled={page === 1 || loading}
-                                    className="px-2 py-1 text-xs border rounded hover:bg-gray-50 disabled:opacity-50"
+                                    className="px-2.5 py-1.5 text-xs font-bold text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                                 >
                                     {t('email.previous')}
                                 </button>
                                 <button
                                     onClick={() => setPage(p => p + 1)}
                                     disabled={page * pageSize >= totalEmails || loading}
-                                    className="px-2 py-1 text-xs border rounded hover:bg-gray-50 disabled:opacity-50"
+                                    className="px-2.5 py-1.5 text-xs font-bold text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                                 >
                                     {t('email.next')}
                                 </button>
@@ -2444,7 +2641,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                 // Combine To and CC for Reply All, excluding self
                                 const originalTo = (selectedEmail.to_full || []).map(e => e.address).filter(e => e && e !== settings.imap_user && e !== from);
                                 const originalCc = (selectedEmail.cc_full || []).map(e => e.address).filter(e => e && e !== settings.imap_user && e !== from);
-                                
+
                                 setToTags([from, ...originalTo]);
                                 setCcTags(originalCc);
                                 setBccTags([]);
@@ -2504,7 +2701,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                         {new Date(selectedEmail.date).toLocaleString()}
                                     </div>
                                 </div>
- 
+
                                 {showDetails && (
                                     <div className="mt-4 p-4 bg-gray-50 dark:bg-slate-900/40 rounded-xl border border-gray-100 dark:border-white/5 text-xs text-gray-600 dark:text-gray-300 space-y-2 relative overflow-hidden break-words">
                                         <div className="break-all sm:break-words"><strong>De:</strong> {selectedEmail.from}</div>
@@ -2837,7 +3034,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                 <p className="text-sm font-black text-gray-900 dark:text-white">{accounts.length} / {currentUser.email_permissions?.account_limit || 1}</p>
                                             </div>
                                             {canManageAccounts && (
-                                                <button 
+                                                <button
                                                     onClick={() => {
                                                         setActiveAccountId(null);
                                                         setSettings({
@@ -2947,7 +3144,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                 />
                                             </div>
                                         </div>
- 
+
                                         <div className="bg-white dark:bg-slate-900/60 p-8 rounded-3xl border border-gray-100 dark:border-white/5 shadow-xl">
                                             <h3 className="font-black text-gray-900 dark:text-white mb-2 text-xl tracking-tight flex items-center gap-3">
                                                 <div className="p-2 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg text-brand-primary">
@@ -2956,7 +3153,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                 Preferências do PandaMail
                                             </h3>
                                             <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Personalize como as mensagens de e-mail são exibidas e abertas no seu PandaMail.</p>
-                                            
+
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 <div>
                                                     <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Forma de Abrir Mensagens</label>
@@ -2975,7 +3172,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                         <option value="window">Janela Flutuante (Arrastável)</option>
                                                     </select>
                                                 </div>
-                                                
+
                                                 <div>
                                                     <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Pré-visualização na Listagem</label>
                                                     <select
@@ -3004,7 +3201,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                         Painel Administrativo de E-mail
                                                     </h3>
                                                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Configurações globais de e-mail para os usuários de sua empresa.</p>
-                                                    
+
                                                     <div className="space-y-6">
                                                         {/* Toggle to allow users to register multiple emails */}
                                                         <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-gray-100 dark:border-white/5">
@@ -3012,11 +3209,11 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                                 <label className="text-sm font-black text-gray-700 dark:text-gray-300">Permitir múltiplos e-mails para usuários comuns</label>
                                                                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Se desativado, usuários comuns só poderão cadastrar no máximo 1 conta de e-mail.</p>
                                                             </div>
-                                                            <input 
-                                                                type="checkbox" 
-                                                                className="w-5 h-5 rounded border-gray-300 text-brand-primary focus:ring-brand-primary cursor-pointer" 
-                                                                checked={allowUsersMultipleEmails} 
-                                                                onChange={toggleUsersMultipleEmails} 
+                                                            <input
+                                                                type="checkbox"
+                                                                className="w-5 h-5 rounded border-gray-300 text-brand-primary focus:ring-brand-primary cursor-pointer"
+                                                                checked={allowUsersMultipleEmails}
+                                                                onChange={toggleUsersMultipleEmails}
                                                             />
                                                         </div>
 
@@ -3026,11 +3223,11 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                                                 <label className="text-sm font-black text-gray-700 dark:text-gray-300">Visualizar todas as contas de e-mail da empresa</label>
                                                                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Ative este toggle para visualizar e gerenciar as contas de e-mail de todos os usuários cadastrados na sua conta.</p>
                                                             </div>
-                                                            <input 
-                                                                type="checkbox" 
-                                                                className="w-5 h-5 rounded border-gray-300 text-brand-primary focus:ring-brand-primary cursor-pointer" 
-                                                                checked={viewAllCompanyEmails} 
-                                                                onChange={toggleViewAllCompanyEmails} 
+                                                            <input
+                                                                type="checkbox"
+                                                                className="w-5 h-5 rounded border-gray-300 text-brand-primary focus:ring-brand-primary cursor-pointer"
+                                                                checked={viewAllCompanyEmails}
+                                                                onChange={toggleViewAllCompanyEmails}
                                                             />
                                                         </div>
                                                     </div>
@@ -3224,8 +3421,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                             <div className="px-2 pb-2 space-y-1">
                                                 {domainContacts.map(contact => (
                                                     <div key={contact.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition-all group">
-                                                        <input 
-                                                            type="checkbox" 
+                                                        <input
+                                                            type="checkbox"
                                                             checked={selectedContacts.includes(contact.email)}
                                                             onChange={() => {
                                                                 setSelectedContacts(prev => prev.includes(contact.email) ? prev.filter(e => e !== contact.email) : [...prev, contact.email]);
@@ -3345,7 +3542,7 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
 
             {/* === Window View Mode === */}
             {openMode === 'window' && selectedEmail && (
-                <div 
+                <div
                     style={{ top: windowPosition.y, left: windowPosition.x }}
                     className="fixed z-[100] w-full max-w-2xl h-[500px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-800 flex flex-col overflow-hidden animate-scale-in"
                     onMouseDown={handleWindowMouseDown}

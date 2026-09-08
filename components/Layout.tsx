@@ -206,7 +206,7 @@ const Layout: React.FC<LayoutProps> = ({
                         onNavigate={onNavigate}
                     />
                     <main className="pandanet-workspace relative flex-1 overflow-hidden p-0">
-                        <div className={`pandanet-page h-full w-full overflow-x-hidden ${['messages', 'email', 'whatspanda'].includes(currentPage) ? 'overflow-hidden p-0' : 'overflow-y-auto p-3 sm:p-5 lg:p-6 xl:p-8'}`}>
+                        <div data-page={currentPage} className={`pandanet-page h-full w-full overflow-x-hidden ${['messages', 'email', 'whatspanda'].includes(currentPage) ? 'overflow-hidden p-0' : 'overflow-auto p-3 sm:p-5 lg:p-6 xl:p-8'}`}>
                             {children}
                         </div>
                     </main>

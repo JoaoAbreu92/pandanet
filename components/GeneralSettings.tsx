@@ -3,7 +3,9 @@ import Card from './Card';
 import { Button } from './ui/Button';
 import { useToast } from './ToastContext';
 import { PencilIcon, XCircleIcon } from './icons';
-import { supabase, getSignedStorageUrl } from '../supabaseClient';
+import { supabase } from '../supabaseClient';
+import { brandingReference } from './brandingStorage';
+import { BrandingImage } from './BrandingMedia';
 // FIX: Correcting the import path for types.
 import type { CompanySettings } from '../types';
 
@@ -20,7 +22,7 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, setSettings
     const handleSave = async () => {
         if (isSaving) return;
         setIsSaving(true);
-        
+
         let finalSettings = { ...tempSettings };
         const newFile = (tempSettings as any)._newLogoFile;
 
@@ -40,8 +42,8 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, setSettings
                 }
 
                 const uploadedPath = data?.path || filePath;
-                const publicUrl = await getSignedStorageUrl(`https://pandanet.grupopixel.com.br/storage/v1/object/public/chat-media/${uploadedPath}`);
-                
+                const publicUrl = brandingReference(`https://pandanet.grupopixel.com.br/storage/v1/object/public/chat-media/${uploadedPath}`);
+
                 finalSettings.logoUrl = publicUrl;
                 delete (finalSettings as any)._newLogoFile;
             } catch (err: any) {
@@ -56,6 +58,7 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, setSettings
             }
         }
 
+        if (finalSettings.logoUrl) finalSettings.logoUrl = brandingReference(finalSettings.logoUrl);
         setSettings(finalSettings);
         showToast('Configurações salvas com sucesso.', 'success');
         setIsSaving(false);
@@ -68,7 +71,7 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, setSettings
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            // Upload imediato ou no handleSave? 
+            // Upload imediato ou no handleSave?
             // Para melhor UX, vamos fazer no handleSave, mas mostrar preview local
             const previewUrl = URL.createObjectURL(file);
             (file as any).preview = previewUrl; // Hack para guardar a referência
@@ -104,7 +107,7 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, setSettings
                     <div className="flex items-center space-x-4">
                         <div className="relative h-16 w-32 border rounded-md flex items-center justify-center bg-gray-50 overflow-hidden group">
                             {tempSettings.logoUrl ? (
-                                <img src={tempSettings.logoUrl} alt="Logo" className="h-full w-full object-contain p-2" />
+                                <BrandingImage src={tempSettings.logoUrl} alt="Logo" className="h-full w-full object-contain p-2" />
                             ) : (
                                 <span className="text-xs text-gray-400">Sem Logo</span>
                             )}

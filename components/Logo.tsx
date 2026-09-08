@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SYSTEM_VERSION } from '../version';
 import { supabase, getCleanImageUrl } from '../supabaseClient';
+import { BrandingImage } from './BrandingMedia';
 
 const defaultLogo = '/logo.png';
 
@@ -48,7 +49,7 @@ const Logo: React.FC<LogoProps> = ({ showText = true, className = '', companyLog
             {loading && !companyLogo ? (
                 <div className="w-32 h-10 bg-slate-200 dark:bg-slate-700 animate-pulse rounded-lg" />
             ) : (
-                <img
+                <BrandingImage
                     src={logoSrc}
                     alt="Logo"
                     className="max-h-full w-auto object-contain transition-all duration-300 dark:brightness-110 dark:contrast-105 dark:drop-shadow-[0_0_3px_rgba(255,255,255,0.45)]"

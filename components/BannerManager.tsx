@@ -7,7 +7,9 @@ import ConfirmModal from './ui/ConfirmModal';
 import { useToast } from './ToastContext';
 import type { Banner } from '../types';
 import { PencilIcon, PlusIcon, XCircleIcon, TrashIcon } from './icons';
-import { supabase, getCleanImageUrl, getSignedStorageUrl } from '../supabaseClient';
+import { supabase } from '../supabaseClient';
+import { brandingReference } from './brandingStorage';
+import { BrandingImage } from './BrandingMedia';
 import { useAuth } from './AuthContext';
 
 // --- Image Cropper Component ---
@@ -211,12 +213,12 @@ const BannerFormModal: React.FC<{
                 return;
             }
 
-            finalImageUrl = await getSignedStorageUrl(
+            finalImageUrl = brandingReference(
             `https://pandanet.grupopixel.com.br/storage/v1/object/public/chat-media/${data?.path || fileName}`
             );
         }
 
-        onSave({ ...formData, imageUrl: finalImageUrl });
+        onSave({ ...formData, imageUrl: brandingReference(finalImageUrl) });
     };
 
     return (
@@ -255,7 +257,7 @@ const BannerFormModal: React.FC<{
                             required
                             placeholder="Texto complementar"
                         />
-                        
+
                         <div className="flex items-center justify-between py-2">
                             <label className="text-sm font-medium text-brand-subtle-text dark:text-gray-300">Mostrar botão "Saiba mais"</label>
                             <input
@@ -281,7 +283,7 @@ const BannerFormModal: React.FC<{
                         <div>
                             <label className="block text-sm font-medium text-brand-subtle-text dark:text-gray-300">Imagem do Banner</label>
                             <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-500 mt-1">Tamanho sugerido do banner: 1200x400 pixels (Proporção 3:1 para não cortar informações)</p>
-                            {formData.imageUrl && <img src={getCleanImageUrl(formData.imageUrl)} alt="Preview" className="mt-2 w-full h-32 object-cover rounded-md border dark:border-gray-700" />}
+                            {formData.imageUrl && <BrandingImage src={formData.imageUrl} alt="Preview" className="mt-2 w-full h-32 object-cover rounded-md border dark:border-gray-700" />}
                             <input type="file" accept="image/*" onChange={handleFileChange} className="mt-2 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-brand-primary hover:file:bg-emerald-100 cursor-pointer" />
                         </div>
                         <div className="flex justify-end space-x-3 pt-2">
@@ -460,7 +462,7 @@ const BannerManager: React.FC = () => {
                         banners.map(banner => (
                             <div key={banner.id} className="flex items-center justify-between p-2 rounded-md hover:bg-gray-50 dark:hover:bg-slate-800 border border-transparent hover:border-gray-100 dark:hover:border-slate-700 transition-all">
                                 <div className="flex items-center space-x-4">
-                                    <img src={getCleanImageUrl(banner.imageUrl)} alt={banner.title} className="w-20 h-10 object-cover rounded-md border dark:border-slate-700" />
+                                    <BrandingImage src={banner.imageUrl} alt={banner.title} className="w-20 h-10 object-cover rounded-md border dark:border-slate-700" />
                                     <div>
                                         <p className="font-semibold text-brand-text dark:text-white">{banner.title}</p>
                                         <p className="text-sm text-brand-subtle-text dark:text-gray-400">{banner.subtitle}</p>

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { useCallback } from 'react';
 import { launchPremiumReaction } from './PremiumReactionBurst';
 import { handleTabKeyDown } from '../utils/tabAccessibility';
 import {
@@ -98,6 +99,89 @@ interface MessageBubbleProps {
     onContextMenu: (e: React.MouseEvent, message: Message) => void;
     onConfirmReceipt?: (msgId: string, visitId: string, creatorId: string) => void;
 }
+
+const ProtectedChatImage: React.FC<{
+    url: string;
+    name?: string;
+    className?: string;
+    onClick?: () => void;
+}> = ({ url, name = 'Imagem enviada', className, onClick }) => {
+    const [resolvedUrl, setResolvedUrl] = useState(url);
+    const [failed, setFailed] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+
+    const refreshUrl = useCallback(async () => {
+        if (!url || refreshing) return;
+
+        setRefreshing(true);
+
+        try {
+            const signedUrl = await getSignedStorageUrl(url, 86400);
+            setResolvedUrl(signedUrl || url);
+            setFailed(false);
+        } catch (error) {
+            console.error(
+                '[Messages] Falha ao renovar URL privada da imagem:',
+                error
+            );
+            setFailed(true);
+        } finally {
+            setRefreshing(false);
+        }
+    }, [refreshing, url]);
+
+    useEffect(() => {
+        let active = true;
+
+        const resolve = async () => {
+            try {
+                const signedUrl = await getSignedStorageUrl(url, 86400);
+
+                if (active) {
+                    setResolvedUrl(signedUrl || url);
+                    setFailed(false);
+                }
+            } catch {
+                if (active) {
+                    setResolvedUrl(url);
+                }
+            }
+        };
+
+        void resolve();
+
+        return () => {
+            active = false;
+        };
+    }, [url]);
+
+    if (failed) {
+        return (
+            <button
+                type="button"
+                onClick={() => void refreshUrl()}
+                className="flex min-h-28 w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-emerald-300 bg-emerald-50/80 p-4 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
+            >
+                <span className="text-2xl">🖼️</span>
+                <span>Imagem temporariamente indisponível</span>
+                <span className="text-[10px] uppercase tracking-wider">
+                    Clique para tentar novamente
+                </span>
+            </button>
+        );
+    }
+
+    return (
+        <img
+            src={resolvedUrl}
+            alt={name}
+            loading="lazy"
+            className={className}
+            onClick={onClick}
+            onError={() => void refreshUrl()}
+        />
+    );
+};
 
 const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
     message,
@@ -268,7 +352,17 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
 
                         {message.file && (message.file.type?.startsWith('image/') || message.file.type === 'sticker') ? (
                             <div className="mt-2 rounded-lg overflow-hidden border bg-gray-50">
-                                <img src={getCleanImageUrl(message.file.url)} alt="Anexo" className="max-w-full h-auto max-h-64 object-contain cursor-pointer" onClick={() => downloadFile(message.file.url, message.file.name || 'imagem.png')} />
+                                <ProtectedChatImage
+                                    url={message.file.url}
+                                    name={message.file.name || 'Imagem enviada'}
+                                    className="max-w-full h-auto max-h-64 object-contain cursor-pointer"
+                                    onClick={() =>
+                                        downloadFile(
+                                            message.file!.url,
+                                            message.file!.name || 'imagem.png'
+                                        )
+                                    }
+                                />
                             </div>
                         ) : message.file ? (
                             <div className="mt-2 p-2 bg-black/10 rounded-lg flex items-center gap-2 overflow-hidden">

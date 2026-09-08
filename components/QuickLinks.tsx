@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Card from './Card';
 import type { Employee } from '../types';
 import { 
@@ -169,8 +170,8 @@ const QuickLinks: React.FC<QuickLinksProps> = ({ onNavigate, currentUser, varian
     </div>
   );
 
-  const modal = isModalOpen && (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+  const modal = isModalOpen ? createPortal(
+    <div className="quick-links-modal fixed inset-0 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl w-full max-w-lg p-6 relative border dark:border-white/5 animate-fade-in-up">
         <button onClick={() => setModalOpen(false)} disabled={isSaving} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-white">
           <XCircleIcon className="w-6 h-6" />
@@ -194,7 +195,7 @@ const QuickLinks: React.FC<QuickLinksProps> = ({ onNavigate, currentUser, varian
         </div>
       </div>
     </div>
-  );
+  , document.body) : null;
 
   if (variant === 'hero') {
     return (

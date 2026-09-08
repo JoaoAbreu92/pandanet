@@ -3,6 +3,7 @@ import type { Banner } from '../types';
 import { ChevronLeftIcon, ChevronRightIcon } from './icons';
 import { supabase, getCleanImageUrl } from '../supabaseClient';
 import { useAuth } from './AuthContext';
+import { BrandingImage } from './BrandingMedia';
 
 // Local fallbacks if no banners are configured
 import bannerPersonalDev from '../assets/banners/personal_development.png';
@@ -45,10 +46,6 @@ const Carousel: React.FC = () => {
     const hasBanners = currentUser?.company?.custom_features?.banners !== undefined
         ? currentUser.company.custom_features.banners
         : currentUser?.company?.plan?.features?.banners;
-
-    if (hasBanners === false) {
-        return null;
-    }
 
     const fetchBanners = async () => {
         if (!currentUser?.company_id) return;
@@ -107,27 +104,30 @@ const Carousel: React.FC = () => {
         setCurrentIndex(slideIndex);
     };
 
+    if (hasBanners === false) return null;
     if (loading) return <div className="w-full h-[200px] sm:h-[300px] md:h-[400px] bg-gray-100 rounded-2xl animate-pulse flex items-center justify-center text-gray-400">Carregando destaques...</div>;
     if (banners.length === 0) return null;
+    const activeBanner = banners[Math.min(currentIndex, banners.length - 1)];
 
     return (
         <div className="relative w-full h-[200px] sm:h-[300px] md:h-[400px] group overflow-hidden rounded-2xl shadow-2xl transition-all duration-300 hover:shadow-cyan-900/20">
             {/* Main Image Background */}
             <div
-                style={{ backgroundImage: `url(${banners[currentIndex].imageUrl})` }}
-                className="w-full h-full bg-center bg-cover duration-700 ease-in-out transform transition-transform"
+                className="relative w-full h-full duration-700 ease-in-out transform transition-transform"
             >
+                <BrandingImage src={activeBanner.imageUrl} alt={activeBanner.title}
+                    className="absolute inset-0 w-full h-full object-cover object-center" />
                 {/* Gradient Overlay for Text Readability */}
                 <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent flex flex-col justify-center items-start text-left p-6 sm:p-12 md:p-16">
                     <div className="max-w-2xl transform transition-all duration-700 translate-y-0 opacity-100 animate-fade-in-up">
                         <h2 className="text-white text-lg sm:text-3xl md:text-5xl font-semibold drop-shadow-lg mb-2 sm:mb-4 md:mb-6 tracking-tight leading-tight">
-                            {banners[currentIndex].title}
+                            {activeBanner.title}
                         </h2>
                         <p className="text-gray-100 text-xs sm:text-base md:text-xl font-light drop-shadow-md mb-3 sm:mb-6 md:mb-8 leading-relaxed border-l-4 border-brand-primary pl-4">
-                            {banners[currentIndex].subtitle}
+                            {activeBanner.subtitle}
                         </p>
-                        {banners[currentIndex].link && banners[currentIndex].showButton !== false && (
-                            <a href={banners[currentIndex].link} className="inline-block px-3 py-1.5 sm:px-6 sm:py-3 bg-brand-primary text-white font-semibold rounded-lg hover:bg-emerald-600 transition-colors shadow-lg text-xs sm:text-base">
+                        {activeBanner.link && activeBanner.showButton !== false && (
+                            <a href={activeBanner.link} className="inline-block px-3 py-1.5 sm:px-6 sm:py-3 bg-brand-primary text-white font-semibold rounded-lg hover:bg-emerald-600 transition-colors shadow-lg text-xs sm:text-base">
                                 Saiba Mais
                             </a>
                         )}

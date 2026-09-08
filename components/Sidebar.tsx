@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Logo from './Logo';
+import { BrandingImage } from './BrandingMedia';
 import {
     HomeIcon,
     ChatBubbleLeftRightIcon,
@@ -356,7 +357,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 <NavItem page="marketplace" label={t('sidebar.marketplace')} icon={BuildingStorefrontIcon} permission="useMarketplace" featureId="marketplace" />
                 <NavItem page="email" label={t('sidebar.pandamail')} icon={EnvelopeIcon} permission="viewEmail" featureId="email" />
                 <NavItem page="calendar" label={t('sidebar.calendar')} icon={CalendarDaysIcon} permission="viewCalendar" featureId="calendar" />
-                <NavMenu label="Agenda" icon={CalendarIcon} menuKey="newAgenda" permission={ghostSuperAdmin || !!currentUser.permissions?.viewAgenda} featureId="new_agenda">
+                <NavMenu label="Agendar" icon={CalendarIcon} menuKey="newAgenda" permission={ghostSuperAdmin || !!currentUser.permissions?.viewAgenda} featureId="new_agenda">
                     <NavItem page="agenda" label="Visitas" icon={UsersIcon} permission="viewAgenda" featureId="new_agenda" context={{ tab: 'visits' }} />
                     <NavItem page="agenda" label="Reuniões" icon={UserGroupIcon} permission="viewAgenda" featureId="new_agenda" context={{ tab: 'meetings' }} />
                     <NavItem page="agenda" label="Treinamentos" icon={PlayIcon} permission="viewAgenda" featureId="new_agenda" context={{ tab: 'trainings' }} />
@@ -426,7 +427,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             <div className={`mt-auto border-t border-white/10 bg-white/[0.03] p-3 text-center
                 ${isOpen ? 'block' : 'hidden md:block md:opacity-0 md:hover:opacity-100 transition-opacity'}`}>
                 {companyLogo && (
-                    <img src={companyLogo} alt={companyName} className="h-8 md:h-10 mx-auto object-contain" />
+                    <BrandingImage src={companyLogo} alt={companyName} className="h-8 md:h-10 mx-auto object-contain" />
                 )}
                 <p className="mt-2 truncate text-xs font-semibold text-slate-200">{companyName}</p>
             </div>

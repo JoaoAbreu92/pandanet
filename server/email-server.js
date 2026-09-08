@@ -197,7 +197,7 @@ app.post('/api/email/fetch-by-ids', authMiddleware, async (req, res) => {
                 const uids = [...new Set(uidsArrays.flat())];
                 
                 if (uids.length > 0) {
-                    for await (const message of client.fetch(uids, { envelope: true, uid: true })) {
+                    for await (const message of client.fetch(uids, { envelope: true, uid: true, flags: true })) {
                         allResults.push({
                             uid: message.uid,
                             messageId: message.envelope.messageId,
@@ -273,7 +273,7 @@ app.post('/api/email/search', authMiddleware, async (req, res) => {
                     // Limit to newest 20 per folder to avoid timeout/bloat
                     const sortedUids = uids.sort((a, b) => b - a).slice(0, 20);
                     
-                    for await (const message of client.fetch(sortedUids, { envelope: true, uid: true })) {
+                    for await (const message of client.fetch(sortedUids, { envelope: true, uid: true, flags: true })) {
                         allResults.push({
                             uid: message.uid,
                             messageId: message.envelope.messageId,
@@ -360,7 +360,7 @@ app.post('/api/email/fetch', authMiddleware, async (req, res) => {
             const range = `${startIndex}:${endIndex}`;
             console.log(`[email-server] Fetching range: ${range} (Page ${page}, Size ${pageSize}, Total ${total})`);
 
-            for await (const message of client.fetch(range, { envelope: true, uid: true })) {
+            for await (const message of client.fetch(range, { envelope: true, uid: true, flags: true })) {
                 emails.push({
                     uid: message.uid,
                     messageId: message.envelope.messageId,
@@ -413,8 +413,41 @@ app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
 
         const lock = await client.getMailboxLock(finalPath);
         try {
-            const message = await client.fetchOne(uidStr, { source: true }, { uid: true });
-            if (!message) return res.status(404).json({ error: 'Email not found' });
+            const message = await client.fetchOne(
+                uidStr,
+                {
+                    source: true,
+                    flags: true
+                },
+                {
+                    uid: true
+                }
+            );
+            if (!message) {
+                return res.status(404).json({
+                    error: 'Email não encontrado nesta pasta.'
+                });
+            }
+
+            const existingFlags = Array.from(
+                message.flags || []
+            );
+
+            if (!existingFlags.includes('\\Seen')) {
+                const marked = await client.messageFlagsAdd(
+                    uidStr,
+                    ['\\Seen'],
+                    {
+                        uid: true
+                    }
+                );
+
+                if (marked === false) {
+                    throw new Error(
+                        'O servidor IMAP não confirmou a marcação como lido.'
+                    );
+                }
+            }
 
             const parsed = await simpleParser(message.source);
 
@@ -443,7 +476,14 @@ app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
                 from: parsed.from?.value?.[0]?.address || 'Desconhecido',
                 subject: parsed.subject,
                 messageId: parsed.messageId,
-                date: parsed.date
+                date: parsed.date,
+                flags: Array.from(
+                    new Set([
+                        ...existingFlags,
+                        '\\Seen'
+                    ])
+                ),
+                seen: true
             });
         } finally {
             lock.release();
@@ -457,25 +497,111 @@ app.post('/api/email/fetch-body', authMiddleware, async (req, res) => {
 
 // --- MANAGE FLAGS (SEEN, FLAGGED, ETC) ---
 app.post('/api/email/flags', authMiddleware, async (req, res) => {
-    const { config, uids, operation, flags, path } = req.body; // operation: 'add' or 'remove'
-    const mailboxPath = path || 'INBOX';
-    if (!config || !uids || !operation || !flags) return res.status(400).json({ error: 'Missing parameters' });
+    const {
+        config,
+        uids,
+        operation,
+        flags,
+        path
+    } = req.body;
 
-    const uidsNum = Array.isArray(uids) ? uids.map(Number) : [Number(uids)];
+    const mailboxPath = path || 'INBOX';
+
+    if (
+        !config ||
+        !uids ||
+        !operation ||
+        !Array.isArray(flags) ||
+        flags.length === 0
+    ) {
+        return res.status(400).json({
+            error: 'Parâmetros obrigatórios ausentes.'
+        });
+    }
+
+    if (!['add', 'remove', 'set'].includes(operation)) {
+        return res.status(400).json({
+            error: 'Operação de flags inválida.'
+        });
+    }
+
+    const rawUids = Array.isArray(uids)
+        ? uids
+        : [uids];
+
+    const uidsNum = [
+        ...new Set(
+            rawUids
+                .map(value => Number(value))
+                .filter(value =>
+                    Number.isSafeInteger(value) &&
+                    value > 0
+                )
+        )
+    ];
+
+    if (uidsNum.length === 0) {
+        return res.status(400).json({
+            error: 'Nenhum UID IMAP válido foi informado.'
+        });
+    }
 
     try {
         const client = await getPooledClient(config);
         const resolvedPath = await resolveFolderPath(client, mailboxPath);
         const lock = await client.getMailboxLock(resolvedPath);
         try {
+            let result;
+
             if (operation === 'add') {
-                await client.messageFlagsAdd(uidsNum, flags, { uid: true });
+                result = await client.messageFlagsAdd(
+                    uidsNum,
+                    flags,
+                    {
+                        uid: true
+                    }
+                );
             } else if (operation === 'remove') {
-                await client.messageFlagsRemove(uidsNum, flags, { uid: true });
-            } else if (operation === 'set') {
-                await client.messageFlagsSet(uidsNum, flags, { uid: true });
+                result = await client.messageFlagsRemove(
+                    uidsNum,
+                    flags,
+                    {
+                        uid: true
+                    }
+                );
+            } else {
+                result = await client.messageFlagsSet(
+                    uidsNum,
+                    flags,
+                    {
+                        uid: true
+                    }
+                );
             }
-            return res.json({ success: true });
+
+            if (result === false) {
+                return res.status(409).json({
+                    error:
+                        'O servidor IMAP não confirmou a alteração.',
+                    success: false
+                });
+            }
+
+            console.log(
+                '[email-server] FLAGS:',
+                operation,
+                'UIDs:',
+                uidsNum.length,
+                'Pasta:',
+                resolvedPath
+            );
+
+            return res.json({
+                success: true,
+                updated: uidsNum.length,
+                operation,
+                flags
+            });
         } finally {
             lock.release();
         }

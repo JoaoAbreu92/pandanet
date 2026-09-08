@@ -9,7 +9,7 @@ import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
 import { useLanguage } from './LanguageContext';
 import { FaceSmileIcon, UserGroupIcon, PaperAirplaneIcon, PlusIcon, ChatBubbleLeftRightIcon, VideoCameraIcon, PhotoIcon, HandThumbUpIcon, ChatBubbleLeftIcon, ShareIcon, HashtagIcon, CakeIcon, XCircleIcon, TrashIcon, ShieldCheckIcon as ShieldCheck } from './icons';
-import type { Post, Employee, Event, Recognition, PostComment, PostReaction, Page, CompanyBadge, UserBadge } from '../types';
+import type { Post, Employee, EmployeePermissions, Event, Recognition, PostComment, PostReaction, Page, CompanyBadge, UserBadge } from '../types';
 import BadgeDetailModal from './BadgeDetailModal';
 import { UserAvatar } from './UserAvatar';
 
@@ -904,7 +904,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ currentUser, allEmployees = [], eve
                 return;
             }
 
-            const permissions = currentUser.permissions || {};
+            const permissions = (currentUser.permissions || {}) as Partial<EmployeePermissions>;
 
             if (
                 newPostContent.trim()

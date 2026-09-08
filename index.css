@@ -1442,3 +1442,2869 @@ body:has(.pandanet-modal-viewport) {
     }
 }
 /* PANDANET_REACTION_TELEGRAM_BURST_END */
+
+/* ==========================================================================
+   PANDA NET ATMOSPHERE + CENTRAL DO DIA
+   ========================================================================== */
+
+:root {
+    --panda-page-bg:
+        radial-gradient(circle at 12% 10%, rgba(16, 185, 129, 0.16), transparent 27rem),
+        radial-gradient(circle at 88% 18%, rgba(45, 212, 191, 0.15), transparent 30rem),
+        radial-gradient(circle at 54% 92%, rgba(148, 163, 184, 0.16), transparent 34rem),
+        linear-gradient(135deg, #edf3ef 0%, #dfeae5 45%, #d8e4e1 100%);
+    --panda-surface: rgba(250, 252, 250, 0.88);
+    --panda-border: rgba(148, 184, 169, 0.36);
+    --panda-text: #102039;
+    --panda-muted: #64748b;
+}
+
+html.dark {
+    --panda-page-bg:
+        radial-gradient(circle at 14% 7%, rgba(5, 150, 105, 0.18), transparent 29rem),
+        radial-gradient(circle at 85% 20%, rgba(13, 148, 136, 0.14), transparent 31rem),
+        radial-gradient(circle at 55% 95%, rgba(71, 85, 105, 0.22), transparent 36rem),
+        linear-gradient(135deg, #151b1d 0%, #172120 48%, #111719 100%);
+    --panda-surface: rgba(28, 37, 38, 0.9);
+    --panda-border: rgba(52, 211, 153, 0.16);
+    --panda-text: #f1f5f9;
+    --panda-muted: #94a3b8;
+}
+
+html,
+body,
+#root {
+    min-height: 100%;
+}
+
+body {
+    background: var(--panda-page-bg) fixed !important;
+    color: var(--panda-text);
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    pointer-events: none;
+    opacity: 0.28;
+    background-image:
+        repeating-radial-gradient(
+            ellipse at 5% 115%,
+            transparent 0 44px,
+            rgba(15, 118, 110, 0.08) 45px 46px,
+            transparent 47px 83px
+        ),
+        repeating-radial-gradient(
+            ellipse at 104% -5%,
+            transparent 0 55px,
+            rgba(5, 150, 105, 0.07) 56px 57px,
+            transparent 58px 99px
+        );
+}
+
+body::after {
+    content: "";
+    position: fixed;
+    right: -7rem;
+    bottom: -7rem;
+    z-index: -1;
+    width: min(38vw, 32rem);
+    aspect-ratio: 1;
+    pointer-events: none;
+    background: url("/logo.png") center/contain no-repeat;
+    opacity: 0.025;
+    filter: grayscale(1);
+}
+
+html.dark body::after {
+    opacity: 0.04;
+    filter: grayscale(1) brightness(1.6);
+}
+
+#root {
+    background: transparent !important;
+}
+
+#root main {
+    background-color: transparent !important;
+}
+
+.premium-daily-shell {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border: 1px solid var(--panda-border);
+    border-radius: 2rem;
+    padding: clamp(1.25rem, 2.1vw, 2rem);
+    background:
+        linear-gradient(
+            135deg,
+            rgba(248, 250, 249, 0.9),
+            rgba(227, 238, 233, 0.78)
+        );
+    box-shadow:
+        0 28px 70px -38px rgba(4, 120, 87, 0.7),
+        inset 0 1px 0 rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(22px);
+}
+
+.dark .premium-daily-shell {
+    background:
+        linear-gradient(
+            135deg,
+            rgba(26, 35, 37, 0.96),
+            rgba(20, 43, 39, 0.88)
+        );
+    box-shadow:
+        0 30px 75px -42px rgba(0, 0, 0, 0.95),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.premium-daily-shell::before,
+.premium-daily-shell::after {
+    content: "";
+    position: absolute;
+    z-index: -2;
+    border-radius: 999px;
+    filter: blur(50px);
+    pointer-events: none;
+}
+
+.premium-daily-shell::before {
+    right: -8rem;
+    top: -10rem;
+    width: 28rem;
+    height: 28rem;
+    background: rgba(52, 211, 153, 0.19);
+}
+
+.premium-daily-shell::after {
+    left: 28%;
+    bottom: -14rem;
+    width: 32rem;
+    height: 28rem;
+    background: rgba(94, 234, 212, 0.12);
+}
+
+.premium-daily-panda {
+    position: absolute;
+    z-index: -1;
+    top: 4rem;
+    left: 42%;
+    width: 23rem;
+    height: 23rem;
+    transform: translateX(-50%);
+    background: url("/logo.png") center/contain no-repeat;
+    opacity: 0.035;
+    filter: grayscale(1);
+    pointer-events: none;
+}
+
+.dark .premium-daily-panda {
+    opacity: 0.055;
+    filter: grayscale(1) brightness(1.7);
+}
+
+.premium-daily-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(25rem, 34rem);
+    align-items: start;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.premium-daily-kicker,
+.premium-card-eyebrow {
+    color: #047857;
+    font-size: 0.64rem;
+    font-weight: 900;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}
+
+.dark .premium-daily-kicker,
+.dark .premium-card-eyebrow {
+    color: #6ee7b7;
+}
+
+.premium-daily-kicker {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid rgba(16, 185, 129, 0.28);
+    border-radius: 999px;
+    padding: 0.45rem 0.75rem;
+    background: rgba(255, 255, 255, 0.55);
+}
+
+.dark .premium-daily-kicker {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.premium-daily-heading h1 {
+    margin-top: 1rem;
+    color: var(--panda-text);
+    font-size: clamp(1.8rem, 3vw, 2.55rem);
+    font-weight: 950;
+    letter-spacing: -0.045em;
+}
+
+.premium-daily-heading p {
+    margin-top: 0.35rem;
+    color: var(--panda-muted);
+    font-size: 0.9rem;
+    text-transform: capitalize;
+}
+
+.premium-weather-compact {
+    height: 9rem;
+    overflow: hidden;
+    border-radius: 1.5rem;
+}
+
+.premium-weather-compact > * {
+    width: 138.9%;
+    transform: scale(0.72);
+    transform-origin: top left;
+}
+
+.premium-daily-bento {
+    display: grid;
+    grid-template-columns: minmax(17rem, 0.92fr) minmax(21rem, 1.28fr) minmax(16rem, 0.82fr);
+    grid-template-areas:
+        "priority feed project"
+        "priority feed tomorrow";
+    gap: 1rem;
+}
+
+.premium-priority-card,
+.premium-feed-card,
+.premium-project-card,
+.premium-tomorrow-card {
+    border: 1px solid var(--panda-border);
+    border-radius: 1.6rem;
+    box-shadow: 0 18px 45px -36px rgba(15, 23, 42, 0.7);
+}
+
+.premium-priority-card,
+.premium-project-card,
+.premium-tomorrow-card {
+    background: var(--panda-surface);
+    backdrop-filter: blur(18px);
+}
+
+.premium-priority-card {
+    grid-area: priority;
+    padding: 1rem;
+}
+
+.premium-feed-card {
+    grid-area: feed;
+    padding: 1rem;
+    color: white;
+    background:
+        linear-gradient(
+            145deg,
+            rgba(22, 58, 52, 0.97),
+            rgba(27, 94, 75, 0.9)
+        );
+}
+
+.dark .premium-feed-card {
+    background:
+        linear-gradient(
+            145deg,
+            rgba(20, 36, 37, 0.98),
+            rgba(19, 66, 56, 0.94)
+        );
+}
+
+.premium-project-card {
+    grid-area: project;
+    padding: 1rem;
+}
+
+.premium-tomorrow-card {
+    grid-area: tomorrow;
+    padding: 1rem;
+}
+
+.premium-priority-card > header,
+.premium-feed-card > header,
+.premium-project-card > header,
+.premium-tomorrow-card > header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.premium-priority-card h2,
+.premium-feed-card h2 {
+    margin-top: 0.3rem;
+    font-size: 0.95rem;
+    font-weight: 850;
+}
+
+.premium-priority-list,
+.premium-feed-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    margin-top: 1rem;
+}
+
+.premium-priority-row {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.75rem;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 1rem;
+    padding: 0.72rem;
+    text-align: left;
+    background: rgba(255, 255, 255, 0.54);
+    transition: 180ms ease;
+}
+
+.dark .premium-priority-row {
+    background: rgba(255, 255, 255, 0.045);
+}
+
+.premium-priority-row:hover {
+    transform: translateY(-2px);
+    border-color: rgba(16, 185, 129, 0.45);
+    background: rgba(255, 255, 255, 0.85);
+}
+
+.dark .premium-priority-row:hover {
+    background: rgba(255, 255, 255, 0.085);
+}
+
+.daily-center-item-icon {
+    display: grid;
+    width: 2.4rem;
+    height: 2.4rem;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 0.85rem;
+    font-weight: 900;
+}
+
+.daily-center-item-icon-meeting {
+    color: #7c3aed;
+    background: #ede9fe;
+}
+
+.daily-center-item-icon-reservation {
+    color: #047857;
+    background: #d1fae5;
+}
+
+.daily-center-item-icon-task {
+    color: #b45309;
+    background: #fef3c7;
+}
+
+.daily-center-item-icon-project {
+    color: #0369a1;
+    background: #e0f2fe;
+}
+
+.premium-priority-copy {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+}
+
+.premium-priority-meta {
+    color: #059669;
+    font-size: 0.59rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.premium-priority-copy strong {
+    overflow: hidden;
+    color: var(--panda-text);
+    font-size: 0.78rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.premium-priority-copy small {
+    overflow: hidden;
+    color: var(--panda-muted);
+    font-size: 0.65rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.premium-row-arrow {
+    color: #94a3b8;
+    font-size: 1.35rem;
+}
+
+.premium-feed-preview {
+    display: flex;
+    width: 100%;
+    align-items: flex-start;
+    gap: 0.7rem;
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    border-radius: 1rem;
+    padding: 0.75rem;
+    color: #e2e8f0;
+    text-align: left;
+    background: rgba(255, 255, 255, 0.075);
+    transition: 180ms ease;
+}
+
+.premium-feed-preview:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.13);
+}
+
+.premium-feed-main {
+    padding: 0.95rem;
+    background: rgba(255, 255, 255, 0.93);
+    color: #1e293b;
+}
+
+.premium-feed-mentioned {
+    border-color: rgba(167, 139, 250, 0.72);
+    box-shadow: inset 3px 0 0 #8b5cf6;
+}
+
+.premium-feed-avatar {
+    display: grid;
+    width: 2.35rem;
+    height: 2.35rem;
+    flex: 0 0 auto;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 999px;
+    color: #065f46;
+    font-weight: 900;
+    background: #d1fae5;
+}
+
+.premium-feed-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.premium-feed-copy {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+}
+
+.premium-feed-copy strong {
+    font-size: 0.76rem;
+}
+
+.premium-feed-copy > span:not(.premium-mentioned-label) {
+    margin-top: 0.18rem;
+    font-size: 0.7rem;
+    line-height: 1.4;
+}
+
+.premium-feed-copy small {
+    margin-top: 0.35rem;
+    color: #94a3b8;
+    font-size: 0.59rem;
+}
+
+.premium-mentioned-label {
+    margin-bottom: 0.25rem;
+    color: #8b5cf6;
+    font-size: 0.61rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.premium-feed-media {
+    display: grid;
+    width: 2rem;
+    height: 2rem;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 0.7rem;
+    color: #047857;
+    background: #d1fae5;
+}
+
+.premium-feed-empty {
+    border: 1px dashed rgba(255, 255, 255, 0.18);
+    border-radius: 1rem;
+    padding: 2rem 1rem;
+    color: #cbd5e1;
+    font-size: 0.75rem;
+    text-align: center;
+}
+
+.premium-project-summary {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-top: 1rem;
+}
+
+.premium-project-number {
+    font-size: 2.2rem;
+    font-weight: 950;
+    color: #059669;
+}
+
+.premium-project-summary strong {
+    display: block;
+    color: var(--panda-text);
+    font-size: 0.78rem;
+}
+
+.premium-project-summary p {
+    margin-top: 0.2rem;
+    color: var(--panda-muted);
+    font-size: 0.64rem;
+}
+
+.premium-project-progress {
+    height: 0.38rem;
+    margin-top: 1rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.18);
+}
+
+.premium-project-progress span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #10b981, #2dd4bf);
+}
+
+.premium-tomorrow-preview {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.65rem;
+    margin-top: 0.8rem;
+    border: 1px solid rgba(148, 163, 184, 0.19);
+    border-radius: 1rem;
+    padding: 0.7rem;
+    text-align: left;
+    background: rgba(255, 255, 255, 0.53);
+}
+
+.dark .premium-tomorrow-preview {
+    background: rgba(255, 255, 255, 0.045);
+}
+
+.premium-tomorrow-date {
+    border-radius: 0.75rem;
+    padding: 0.55rem;
+    color: #047857;
+    font-size: 0.67rem;
+    font-weight: 900;
+    background: #d1fae5;
+}
+
+.premium-tomorrow-preview > span:nth-child(2) {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+}
+
+.premium-tomorrow-preview strong {
+    color: var(--panda-text);
+    font-size: 0.7rem;
+}
+
+.premium-tomorrow-preview small {
+    color: var(--panda-muted);
+    font-size: 0.6rem;
+}
+
+.premium-tomorrow-empty {
+    margin-top: 0.8rem;
+    border: 1px dashed rgba(148, 163, 184, 0.3);
+    border-radius: 1rem;
+    padding: 1rem;
+    color: var(--panda-muted);
+    font-size: 0.68rem;
+}
+
+.premium-reminder-note {
+    margin-top: 0.65rem;
+    color: var(--panda-muted);
+    font-size: 0.6rem;
+}
+
+.premium-daily-footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(26rem, 1fr);
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.premium-quick-links {
+    min-width: 0;
+    overflow: hidden;
+    border-radius: 1.5rem;
+}
+
+.premium-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.7rem;
+}
+
+.premium-stat-card {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    border: 1px solid var(--panda-border);
+    border-radius: 1.25rem;
+    padding: 0.78rem;
+    background: var(--panda-surface);
+    backdrop-filter: blur(16px);
+}
+
+.premium-stat-card > span {
+    color: #10b981;
+    font-size: 0.9rem;
+}
+
+.premium-stat-card strong {
+    color: var(--panda-text);
+    font-size: 1.15rem;
+    font-weight: 950;
+}
+
+.premium-stat-card small {
+    overflow: hidden;
+    color: var(--panda-muted);
+    font-size: 0.55rem;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+@media (max-width: 1279px) {
+    .premium-daily-heading {
+        grid-template-columns: 1fr;
+    }
+
+    .premium-weather-compact {
+        max-width: 44rem;
+    }
+
+    .premium-daily-bento {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-areas:
+            "priority feed"
+            "project tomorrow";
+    }
+
+    .premium-daily-footer {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 767px) {
+    .premium-daily-shell {
+        border-radius: 1.4rem;
+        padding: 1rem;
+    }
+
+    .premium-daily-heading {
+        gap: 1rem;
+    }
+
+    .premium-weather-compact {
+        height: 8rem;
+    }
+
+    .premium-weather-compact > * {
+        width: 156.25%;
+        transform: scale(0.64);
+    }
+
+    .premium-daily-bento {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "priority"
+            "feed"
+            "project"
+            "tomorrow";
+    }
+
+    .premium-stat-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .premium-feed-main {
+        padding: 0.75rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .premium-priority-row,
+    .premium-feed-preview {
+        transition: none;
+    }
+}
+
+/* ==========================================================================
+   CENTRAL DO DIA V2 — REFERÊNCIA VISUAL APROVADA
+   ========================================================================== */
+
+.pandanet-home-page {
+    position: relative;
+    isolation: isolate;
+    margin: -0.35rem;
+    padding: clamp(0.5rem, 1vw, 1rem);
+    overflow: hidden;
+    border-radius: 1.75rem;
+}
+
+.pandanet-home-page::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -3;
+    border-radius: inherit;
+    background-image:
+        linear-gradient(
+            rgba(244, 248, 246, 0.17),
+            rgba(226, 237, 232, 0.27)
+        ),
+        url("/home-panda-background.png");
+    background-position: center top;
+    background-size: cover;
+    background-repeat: no-repeat;
+}
+
+.dark .pandanet-home-page::before {
+    background-image:
+        linear-gradient(
+            rgba(10, 17, 19, 0.79),
+            rgba(12, 25, 23, 0.84)
+        ),
+        url("/home-panda-background.png");
+    filter: saturate(0.8) contrast(1.05);
+}
+
+.pandanet-home-page::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    pointer-events: none;
+    border-radius: inherit;
+    background:
+        radial-gradient(
+            circle at 47% 26%,
+            rgba(255, 255, 255, 0.12),
+            transparent 25rem
+        ),
+        linear-gradient(
+            135deg,
+            rgba(255, 255, 255, 0.08),
+            transparent 45%
+        );
+}
+
+.pandanet-home-page .premium-daily-shell {
+    padding: clamp(1rem, 1.7vw, 1.55rem);
+    background: rgba(245, 249, 247, 0.28);
+    box-shadow:
+        0 24px 65px -42px rgba(15, 79, 62, 0.8),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.dark .pandanet-home-page .premium-daily-shell {
+    background: rgba(15, 29, 28, 0.72);
+    box-shadow:
+        0 28px 75px -45px rgba(0, 0, 0, 0.95),
+        inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.pandanet-home-page .premium-daily-panda {
+    display: none;
+}
+
+.premium-daily-heading {
+    grid-template-columns: minmax(0, 1fr) minmax(31rem, 39rem);
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.compact-weather-capsule {
+    display: grid;
+    min-height: 6.8rem;
+    grid-template-columns: auto minmax(12rem, 1fr) auto;
+    align-items: center;
+    gap: 1rem;
+    overflow: hidden;
+    border: 1px solid rgba(167, 243, 208, 0.66);
+    border-radius: 1.45rem;
+    padding: 0.9rem 1rem;
+    background:
+        linear-gradient(
+            120deg,
+            rgba(255, 255, 255, 0.72),
+            rgba(216, 246, 234, 0.64)
+        );
+    box-shadow:
+        0 18px 40px -32px rgba(5, 150, 105, 0.8),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(18px);
+}
+
+.dark .compact-weather-capsule {
+    border-color: rgba(52, 211, 153, 0.17);
+    background:
+        linear-gradient(
+            120deg,
+            rgba(30, 48, 47, 0.92),
+            rgba(28, 76, 64, 0.82)
+        );
+    box-shadow:
+        0 20px 45px -32px rgba(0, 0, 0, 0.95),
+        inset 0 1px 0 rgba(255, 255, 255, 0.055);
+}
+
+.compact-weather-now {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.compact-weather-main-icon {
+    font-size: 2.35rem;
+    filter: drop-shadow(0 7px 8px rgba(15, 23, 42, 0.16));
+}
+
+.compact-weather-now > div {
+    display: flex;
+    flex-direction: column;
+}
+
+.compact-weather-temperature {
+    color: var(--panda-text);
+    font-size: 2rem;
+    font-weight: 950;
+    letter-spacing: -0.06em;
+    line-height: 1;
+}
+
+.compact-weather-description {
+    margin-top: 0.2rem;
+    color: var(--panda-muted);
+    font-size: 0.62rem;
+    font-weight: 800;
+}
+
+.compact-weather-details {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.45rem;
+}
+
+.compact-weather-details span {
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid rgba(148, 163, 184, 0.24);
+    padding-left: 0.65rem;
+    color: var(--panda-muted);
+    font-size: 0.54rem;
+    text-transform: uppercase;
+}
+
+.compact-weather-details strong {
+    margin-top: 0.1rem;
+    color: var(--panda-text);
+    font-size: 0.67rem;
+}
+
+.compact-weather-hours {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.compact-weather-hours > div {
+    display: grid;
+    min-width: 3.15rem;
+    place-items: center;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 0.9rem;
+    padding: 0.35rem;
+    background: rgba(255, 255, 255, 0.48);
+}
+
+.dark .compact-weather-hours > div {
+    background: rgba(255, 255, 255, 0.045);
+}
+
+.compact-weather-hours small {
+    color: var(--panda-muted);
+    font-size: 0.48rem;
+    font-weight: 800;
+}
+
+.compact-weather-hours span {
+    font-size: 1rem;
+}
+
+.compact-weather-hours strong {
+    color: var(--panda-text);
+    font-size: 0.62rem;
+}
+
+.compact-weather-loading {
+    display: grid;
+    place-items: center;
+    color: var(--panda-muted);
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.premium-daily-bento {
+    grid-template-columns:
+        minmax(17rem, 0.92fr)
+        minmax(24rem, 1.32fr)
+        minmax(17rem, 0.88fr);
+}
+
+.premium-priority-card,
+.premium-project-card,
+.premium-tomorrow-card {
+    background: rgba(249, 251, 250, 0.73);
+}
+
+.dark .premium-priority-card,
+.dark .premium-project-card,
+.dark .premium-tomorrow-card {
+    background: rgba(22, 34, 34, 0.82);
+}
+
+.premium-feed-card {
+    background:
+        linear-gradient(
+            145deg,
+            rgba(30, 69, 61, 0.95),
+            rgba(42, 102, 83, 0.9)
+        );
+}
+
+.dark .premium-feed-card {
+    background:
+        linear-gradient(
+            145deg,
+            rgba(21, 42, 41, 0.97),
+            rgba(24, 70, 59, 0.93)
+        );
+}
+
+.premium-project-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+}
+
+.premium-project-row {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.65rem;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 0.95rem;
+    padding: 0.58rem 0.65rem;
+    text-align: left;
+    background: rgba(255, 255, 255, 0.47);
+    transition: 180ms ease;
+}
+
+.dark .premium-project-row {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.premium-project-row:hover {
+    transform: translateY(-2px);
+    border-color: rgba(16, 185, 129, 0.4);
+}
+
+.premium-project-row-copy {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+}
+
+.premium-project-row-copy strong {
+    overflow: hidden;
+    color: var(--panda-text);
+    font-size: 0.69rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.premium-project-row-copy small {
+    color: var(--panda-muted);
+    font-size: 0.55rem;
+}
+
+.premium-project-ring {
+    display: grid;
+    width: 2.3rem;
+    height: 2.3rem;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 3px solid rgba(16, 185, 129, 0.25);
+    border-top-color: #10b981;
+    border-radius: 999px;
+}
+
+.premium-project-ring span {
+    color: var(--panda-text);
+    font-size: 0.47rem;
+    font-weight: 900;
+}
+
+.premium-project-empty {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    border: 1px dashed rgba(148, 163, 184, 0.3);
+    border-radius: 1rem;
+    padding: 0.85rem;
+}
+
+.premium-project-empty strong {
+    display: block;
+    color: var(--panda-text);
+    font-size: 0.68rem;
+}
+
+.premium-project-empty p {
+    color: var(--panda-muted);
+    font-size: 0.56rem;
+}
+
+.pandanet-home-page > section:not(.premium-daily-shell),
+.pandanet-home-page > div,
+.pandanet-home-page > article {
+    backdrop-filter: blur(16px);
+}
+
+@media (max-width: 1279px) {
+    .premium-daily-heading {
+        grid-template-columns: 1fr;
+    }
+
+    .compact-weather-capsule {
+        max-width: 52rem;
+    }
+}
+
+@media (max-width: 767px) {
+    .pandanet-home-page {
+        margin: -0.15rem;
+        padding: 0.35rem;
+        border-radius: 1.25rem;
+    }
+
+    .compact-weather-capsule {
+        grid-template-columns: 1fr;
+        gap: 0.7rem;
+    }
+
+    .compact-weather-details {
+        order: 3;
+    }
+
+    .compact-weather-hours {
+        justify-content: space-between;
+    }
+
+    .compact-weather-hours > div {
+        flex: 1;
+    }
+}
+
+/* PANDA NET HOME — MODELO DEFINITIVO V4 */
+
+/*
+ * O AppShell perde o preenchimento padrão somente quando contém a Home.
+ * Sidebar, Header e todos os demais módulos permanecem intactos.
+ */
+#root main:has(.pandanet-home-page) {
+    padding: 0 !important;
+    background: transparent !important;
+}
+
+#root main:has(.pandanet-home-page) > * {
+    max-width: none !important;
+}
+
+.pandanet-home-page {
+    position: relative !important;
+    isolation: isolate !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: calc(100vh - 4rem) !important;
+    margin: 0 !important;
+    padding:
+        clamp(2.25rem, 4.4vh, 4rem)
+        clamp(2.4rem, 5vw, 6rem)
+        clamp(2.5rem, 5vh, 4.5rem) !important;
+    overflow: hidden !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+}
+
+.pandanet-home-page::before {
+    content: "" !important;
+    position: absolute !important;
+    inset: 0 !important;
+    z-index: -5 !important;
+    display: block !important;
+    background:
+        url("/home-panda-background.png")
+        center center / cover
+        no-repeat !important;
+    opacity: 1 !important;
+    filter:
+        saturate(1.08)
+        contrast(1.04)
+        brightness(0.99) !important;
+}
+
+.pandanet-home-page::after {
+    content: "" !important;
+    position: absolute !important;
+    inset: 0 !important;
+    z-index: -4 !important;
+    pointer-events: none !important;
+    background:
+        radial-gradient(
+            circle at 48% 24%,
+            rgba(255, 255, 255, 0.03),
+            transparent 30rem
+        ) !important;
+}
+
+.dark .pandanet-home-page::before {
+    filter:
+        saturate(0.78)
+        contrast(1.1)
+        brightness(0.34) !important;
+}
+
+.dark .pandanet-home-page::after {
+    background:
+        linear-gradient(
+            rgba(8, 16, 18, 0.28),
+            rgba(7, 19, 18, 0.38)
+        ) !important;
+}
+
+.pandanet-home-page .premium-daily-shell {
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100rem !important;
+    margin: 0 auto !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+.pandanet-home-page .premium-daily-shell::before,
+.pandanet-home-page .premium-daily-shell::after,
+.pandanet-home-page .premium-daily-panda {
+    display: none !important;
+}
+
+/* Cabeçalho e clima */
+
+.premium-daily-heading {
+    display: grid !important;
+    grid-template-columns:
+        minmax(0, 1fr)
+        clamp(25rem, 31vw, 32rem) !important;
+    align-items: start !important;
+    gap: 2.5rem !important;
+    margin: 0 0 1.45rem !important;
+}
+
+.premium-daily-kicker {
+    border-color: rgba(5, 150, 105, 0.22) !important;
+    padding: 0.48rem 0.82rem !important;
+    color: #567465 !important;
+    background: rgba(255, 255, 255, 0.72) !important;
+    box-shadow: 0 8px 25px -20px rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(12px);
+}
+
+.dark .premium-daily-kicker {
+    color: #86d9b6 !important;
+    border-color: rgba(110, 231, 183, 0.16) !important;
+    background: rgba(18, 32, 32, 0.76) !important;
+}
+
+.premium-daily-heading h1 {
+    margin-top: 1.05rem !important;
+    color: #112039 !important;
+    font-size: clamp(2rem, 2.75vw, 2.85rem) !important;
+    font-weight: 950 !important;
+    letter-spacing: -0.052em !important;
+    line-height: 1 !important;
+}
+
+.dark .premium-daily-heading h1 {
+    color: #f8fafc !important;
+}
+
+.premium-daily-heading p {
+    margin-top: 0.6rem !important;
+    color: #51657b !important;
+    font-size: clamp(0.75rem, 0.86vw, 0.9rem) !important;
+    font-weight: 500 !important;
+}
+
+.dark .premium-daily-heading p {
+    color: #aebdc9 !important;
+}
+
+.premium-daily-heading > div:first-child::after {
+    content: "";
+    display: block;
+    width: 1.65rem;
+    height: 0.18rem;
+    margin-top: 0.75rem;
+    border-radius: 999px;
+    background: #15946d;
+}
+
+/* Clima exatamente como cápsula superior */
+
+.compact-weather-capsule {
+    display: grid !important;
+    min-height: 5.55rem !important;
+    grid-template-columns:
+        auto minmax(9rem, 1fr) auto !important;
+    align-items: center !important;
+    gap: 0.85rem !important;
+    border: 1px solid rgba(148, 177, 164, 0.3) !important;
+    border-radius: 1.45rem !important;
+    padding: 0.72rem 0.92rem !important;
+    background: rgba(253, 254, 253, 0.9) !important;
+    box-shadow:
+        0 18px 38px -26px rgba(30, 68, 58, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+    backdrop-filter: blur(18px) !important;
+}
+
+.dark .compact-weather-capsule {
+    border-color: rgba(52, 211, 153, 0.15) !important;
+    background: rgba(23, 39, 39, 0.92) !important;
+}
+
+.compact-weather-main-icon {
+    font-size: 2.1rem !important;
+}
+
+.compact-weather-temperature {
+    font-size: 1.85rem !important;
+}
+
+.compact-weather-description {
+    font-size: 0.57rem !important;
+}
+
+.compact-weather-details {
+    gap: 0.3rem !important;
+}
+
+.compact-weather-details span {
+    padding-left: 0.5rem !important;
+    font-size: 0.48rem !important;
+}
+
+.compact-weather-details strong {
+    font-size: 0.61rem !important;
+}
+
+.compact-weather-hours {
+    gap: 0.22rem !important;
+}
+
+.compact-weather-hours > div {
+    min-width: 2.75rem !important;
+    border: 0 !important;
+    border-left: 1px solid rgba(148, 163, 184, 0.2) !important;
+    border-radius: 0 !important;
+    padding: 0.22rem 0.38rem !important;
+    background: transparent !important;
+}
+
+.compact-weather-hours small {
+    font-size: 0.45rem !important;
+}
+
+.compact-weather-hours span {
+    font-size: 0.92rem !important;
+}
+
+.compact-weather-hours strong {
+    font-size: 0.58rem !important;
+}
+
+/* Grade principal com as proporções exatas da referência */
+
+.premium-daily-bento {
+    display: grid !important;
+    grid-template-columns:
+        minmax(18rem, 0.86fr)
+        minmax(27rem, 1.2fr)
+        minmax(19rem, 0.91fr) !important;
+    grid-template-rows:
+        minmax(15rem, auto)
+        minmax(8.8rem, auto) !important;
+    grid-template-areas:
+        "priority feed project"
+        "priority feed tomorrow" !important;
+    gap: 1.25rem !important;
+    align-items: stretch !important;
+}
+
+.premium-priority-card,
+.premium-feed-card,
+.premium-project-card,
+.premium-tomorrow-card {
+    border: 1px solid rgba(144, 174, 160, 0.26) !important;
+    border-radius: 1.55rem !important;
+    box-shadow:
+        0 20px 40px -30px rgba(24, 61, 51, 0.48) !important;
+}
+
+.premium-priority-card,
+.premium-project-card,
+.premium-tomorrow-card {
+    color: #172033 !important;
+    background: rgba(252, 253, 252, 0.9) !important;
+    backdrop-filter: blur(17px) !important;
+}
+
+.dark .premium-priority-card,
+.dark .premium-project-card,
+.dark .premium-tomorrow-card {
+    color: #f1f5f9 !important;
+    border-color: rgba(52, 211, 153, 0.13) !important;
+    background: rgba(20, 34, 34, 0.91) !important;
+}
+
+.premium-priority-card {
+    display: flex !important;
+    min-height: 29.4rem !important;
+    flex-direction: column !important;
+    padding: 1.2rem !important;
+}
+
+.premium-feed-card {
+    display: flex !important;
+    min-height: 29.4rem !important;
+    flex-direction: column !important;
+    padding: 1.2rem !important;
+    background:
+        linear-gradient(
+            155deg,
+            rgba(32, 64, 59, 0.98),
+            rgba(54, 124, 100, 0.93)
+        ) !important;
+    backdrop-filter: blur(18px) !important;
+}
+
+.dark .premium-feed-card {
+    background:
+        linear-gradient(
+            155deg,
+            rgba(20, 40, 39, 0.98),
+            rgba(25, 82, 66, 0.95)
+        ) !important;
+}
+
+.premium-project-card,
+.premium-tomorrow-card {
+    padding: 1.05rem !important;
+}
+
+.premium-card-eyebrow {
+    font-size: 0.67rem !important;
+}
+
+.premium-priority-card h2,
+.premium-feed-card h2 {
+    max-width: 21rem;
+    font-size: 0.91rem !important;
+    line-height: 1.42 !important;
+}
+
+.premium-priority-list {
+    flex: 1 !important;
+    gap: 0.65rem !important;
+    margin-top: 1.05rem !important;
+}
+
+.premium-priority-row {
+    min-height: 4.7rem !important;
+    padding: 0.76rem !important;
+    border-color: rgba(148, 163, 184, 0.24) !important;
+    border-radius: 1rem !important;
+    background: rgba(255, 255, 255, 0.65) !important;
+}
+
+.dark .premium-priority-row {
+    background: rgba(255, 255, 255, 0.045) !important;
+}
+
+.daily-center-item-icon {
+    width: 2.65rem !important;
+    height: 2.65rem !important;
+    border-radius: 0.85rem !important;
+}
+
+.premium-priority-copy strong {
+    font-size: 0.78rem !important;
+}
+
+.premium-priority-copy small {
+    margin-top: 0.15rem;
+    font-size: 0.61rem !important;
+}
+
+.premium-priority-footer-button,
+.premium-feed-footer-button {
+    display: flex;
+    width: 100%;
+    min-height: 2.85rem;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 0.8rem;
+    border-radius: 0.9rem;
+    font-size: 0.68rem;
+    font-weight: 900;
+    transition: 180ms ease;
+}
+
+.premium-priority-footer-button {
+    border: 1px solid rgba(16, 185, 129, 0.36);
+    color: #172033;
+    background: rgba(255, 255, 255, 0.36);
+}
+
+.dark .premium-priority-footer-button {
+    color: #f8fafc;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.premium-feed-footer-button {
+    margin-top: auto;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #17342d;
+    background: rgba(244, 251, 248, 0.82);
+}
+
+.premium-priority-footer-button:hover,
+.premium-feed-footer-button:hover {
+    transform: translateY(-2px);
+}
+
+/* Feed principal e duas publicações menores */
+
+.premium-feed-list {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 0.75rem !important;
+    margin-top: 1rem !important;
+}
+
+.premium-feed-main {
+    grid-column: 1 / -1 !important;
+    min-height: 10.5rem !important;
+    padding: 1rem !important;
+    color: #1d2939 !important;
+    background: rgba(253, 253, 253, 0.95) !important;
+}
+
+.premium-feed-preview:not(.premium-feed-main) {
+    min-height: 7.35rem !important;
+    padding: 0.75rem !important;
+    background: rgba(255, 255, 255, 0.88) !important;
+    color: #253248 !important;
+}
+
+.premium-feed-copy > span:not(.premium-mentioned-label) {
+    display: -webkit-box !important;
+    overflow: hidden !important;
+    -webkit-box-orient: vertical !important;
+    -webkit-line-clamp: 3 !important;
+    color: inherit !important;
+    font-size: 0.69rem !important;
+}
+
+.premium-feed-copy small {
+    font-size: 0.55rem !important;
+}
+
+/* Projetos iguais à coluna da referência */
+
+.premium-project-list {
+    gap: 0 !important;
+    margin-top: 0.8rem !important;
+    overflow: hidden;
+    border: 1px solid rgba(148, 163, 184, 0.21);
+    border-radius: 1rem;
+}
+
+.premium-project-row {
+    min-height: 4.15rem !important;
+    border: 0 !important;
+    border-bottom:
+        1px solid rgba(148, 163, 184, 0.19) !important;
+    border-radius: 0 !important;
+    padding: 0.7rem 0.8rem !important;
+    background: rgba(255, 255, 255, 0.5) !important;
+}
+
+.premium-project-row:last-child {
+    border-bottom: 0 !important;
+}
+
+.dark .premium-project-row {
+    background: rgba(255, 255, 255, 0.035) !important;
+}
+
+.premium-project-row-copy strong {
+    font-size: 0.75rem !important;
+}
+
+.premium-project-ring {
+    width: 2.45rem !important;
+    height: 2.45rem !important;
+}
+
+.premium-project-empty {
+    min-height: 7rem;
+    border: 0 !important;
+}
+
+/* Amanhã */
+
+.premium-tomorrow-preview {
+    min-height: 4.3rem !important;
+    margin-top: 0.8rem !important;
+}
+
+.premium-reminder-note {
+    margin-top: 0.55rem !important;
+}
+
+/* Rodapé: acessos à esquerda e quatro números à direita */
+
+.premium-daily-footer {
+    display: grid !important;
+    grid-template-columns:
+        minmax(0, 1.6fr)
+        minmax(31rem, 0.96fr) !important;
+    gap: 1.25rem !important;
+    align-items: stretch !important;
+    margin-top: 1.25rem !important;
+}
+
+.premium-quick-links {
+    overflow: hidden !important;
+    border: 1px solid rgba(144, 174, 160, 0.27) !important;
+    border-radius: 1.45rem !important;
+    background: rgba(252, 253, 252, 0.9) !important;
+    box-shadow:
+        0 20px 40px -31px rgba(24, 61, 51, 0.5) !important;
+    backdrop-filter: blur(17px) !important;
+}
+
+.dark .premium-quick-links {
+    border-color: rgba(52, 211, 153, 0.12) !important;
+    background: rgba(21, 35, 35, 0.91) !important;
+}
+
+.premium-quick-links > * {
+    height: 100% !important;
+    padding: 0.85rem 1rem !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.premium-quick-links [class*="grid-cols"],
+.premium-quick-links .grid {
+    display: grid !important;
+    grid-template-columns:
+        repeat(auto-fit, minmax(7.3rem, 1fr)) !important;
+    gap: 0 !important;
+    width: 100% !important;
+}
+
+.premium-quick-links [class*="grid-cols"] > *,
+.premium-quick-links .grid > * {
+    min-width: 0 !important;
+    min-height: 3.15rem !important;
+    height: 3.15rem !important;
+    border: 0 !important;
+    border-right:
+        1px solid rgba(148, 163, 184, 0.22) !important;
+    border-radius: 0 !important;
+    padding: 0.35rem 0.75rem !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.premium-quick-links [class*="grid-cols"] > *:last-child,
+.premium-quick-links .grid > *:last-child {
+    border-right: 0 !important;
+}
+
+.premium-quick-links [class*="grid-cols"] > *:hover,
+.premium-quick-links .grid > *:hover {
+    background: rgba(16, 185, 129, 0.07) !important;
+}
+
+.premium-quick-links [class*="grid-cols"] svg,
+.premium-quick-links .grid svg {
+    width: 1.35rem !important;
+    height: 1.35rem !important;
+}
+
+.premium-quick-links [class*="grid-cols"] p,
+.premium-quick-links [class*="grid-cols"] span,
+.premium-quick-links .grid p,
+.premium-quick-links .grid span {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+.premium-stat-grid {
+    grid-template-columns:
+        repeat(4, minmax(0, 1fr)) !important;
+    gap: 0.75rem !important;
+}
+
+.premium-stat-card {
+    min-height: 7.35rem !important;
+    justify-content: center !important;
+    border-color: rgba(144, 174, 160, 0.26) !important;
+    border-radius: 1.25rem !important;
+    padding: 0.9rem !important;
+    background: rgba(252, 253, 252, 0.9) !important;
+    box-shadow:
+        0 20px 40px -31px rgba(24, 61, 51, 0.5) !important;
+    backdrop-filter: blur(17px) !important;
+}
+
+.dark .premium-stat-card {
+    border-color: rgba(52, 211, 153, 0.12) !important;
+    background: rgba(21, 35, 35, 0.91) !important;
+}
+
+/* Responsividade preservando a composição */
+
+@media (max-width: 1450px) {
+    .pandanet-home-page {
+        padding:
+            2rem
+            clamp(1.5rem, 3vw, 3rem)
+            2.5rem !important;
+    }
+
+    .premium-daily-bento {
+        grid-template-columns:
+            minmax(16rem, 0.86fr)
+            minmax(23rem, 1.18fr)
+            minmax(16rem, 0.88fr) !important;
+    }
+
+    .premium-daily-footer {
+        grid-template-columns:
+            minmax(0, 1.48fr)
+            minmax(27rem, 0.95fr) !important;
+    }
+}
+
+@media (max-width: 1180px) {
+    .premium-daily-heading {
+        grid-template-columns: 1fr !important;
+    }
+
+    .compact-weather-capsule {
+        max-width: 45rem;
+    }
+
+    .premium-daily-bento {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr)) !important;
+        grid-template-rows: auto !important;
+        grid-template-areas:
+            "priority feed"
+            "project tomorrow" !important;
+    }
+
+    .premium-priority-card,
+    .premium-feed-card {
+        min-height: 28rem !important;
+    }
+
+    .premium-daily-footer {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+@media (max-width: 767px) {
+    #root main:has(.pandanet-home-page) {
+        padding: 0 !important;
+    }
+
+    .pandanet-home-page {
+        padding: 1rem !important;
+    }
+
+    .premium-daily-heading {
+        gap: 1rem !important;
+    }
+
+    .compact-weather-capsule {
+        grid-template-columns: 1fr !important;
+    }
+
+    .premium-daily-bento {
+        grid-template-columns: 1fr !important;
+        grid-template-areas:
+            "priority"
+            "feed"
+            "project"
+            "tomorrow" !important;
+    }
+
+    .premium-priority-card,
+    .premium-feed-card {
+        min-height: auto !important;
+    }
+
+    .premium-feed-list {
+        grid-template-columns: 1fr !important;
+    }
+
+    .premium-feed-main {
+        grid-column: auto !important;
+    }
+
+    .premium-quick-links [class*="grid-cols"],
+    .premium-quick-links .grid {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr)) !important;
+        gap: 0.35rem !important;
+    }
+
+    .premium-quick-links [class*="grid-cols"] > *,
+    .premium-quick-links .grid > * {
+        border:
+            1px solid rgba(148, 163, 184, 0.18) !important;
+        border-radius: 0.8rem !important;
+    }
+
+    .premium-stat-grid {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr)) !important;
+    }
+}
+
+/* FIM PANDA NET HOME — MODELO DEFINITIVO V4 */
+
+
+/* PANDA NET HOME — AJUSTES V7 */
+
+#root main:has(.pandanet-home-page) {
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+}
+
+.pandanet-home-page {
+    position: relative !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: calc(100vh - 4rem) !important;
+    margin: 0 !important;
+    padding:
+        clamp(1.2rem, 1.9vw, 2rem)
+        clamp(0.95rem, 1.75vw, 1.9rem)
+        clamp(1.35rem, 2vw, 2.2rem) !important;
+    isolation: isolate;
+}
+
+.pandanet-home-page::before {
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 0 !important;
+    background-image:
+        linear-gradient(
+            90deg,
+            rgba(246, 249, 247, 0.08),
+            rgba(236, 247, 242, 0.04)
+        ),
+        url("/home-panda-background.png") !important;
+    background-repeat: no-repeat !important;
+    background-position: center center !important;
+    background-size: cover !important;
+    filter: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+}
+
+.dark .pandanet-home-page::before {
+    background-image:
+        linear-gradient(
+            90deg,
+            rgba(12, 22, 24, 0.68),
+            rgba(14, 31, 29, 0.58)
+        ),
+        url("/home-panda-background.png") !important;
+    background-position: center center !important;
+    background-size: cover !important;
+    filter: brightness(0.5) saturate(0.84) !important;
+}
+
+.pandanet-home-page::after {
+    inset: 0 !important;
+    background:
+        radial-gradient(
+            circle at 48% 14%,
+            rgba(255, 255, 255, 0.17),
+            transparent 35%
+        ) !important;
+}
+
+.pandanet-home-page .premium-daily-shell {
+    width: 100% !important;
+    max-width: none !important;
+    min-height: calc(100vh - 6.4rem) !important;
+    margin: 0 !important;
+    padding:
+        clamp(1.1rem, 1.65vw, 1.75rem)
+        clamp(1rem, 1.55vw, 1.65rem)
+        clamp(1.15rem, 1.75vw, 1.85rem) !important;
+}
+
+/* Clima compacto */
+
+.compact-weather-capsule {
+    position: relative;
+    display: grid !important;
+    min-height: 5.65rem !important;
+    grid-template-columns:
+        minmax(10rem, 1.15fr)
+        minmax(10rem, 0.9fr)
+        auto !important;
+    align-items: center !important;
+    gap: 0.75rem !important;
+    overflow: visible !important;
+    border: 1px solid rgba(143, 174, 160, 0.32) !important;
+    border-radius: 1.45rem !important;
+    padding: 0.72rem 0.9rem !important;
+    color: #172033;
+    background: rgba(253, 254, 253, 0.91) !important;
+    box-shadow:
+        0 18px 38px -27px rgba(30, 68, 58, 0.48) !important;
+    backdrop-filter: blur(18px) !important;
+}
+
+.dark .compact-weather-capsule {
+    color: #f8fafc;
+    border-color: rgba(52, 211, 153, 0.15) !important;
+    background: rgba(22, 38, 38, 0.93) !important;
+}
+
+.compact-weather-current {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.62rem;
+}
+
+.compact-weather-main-icon {
+    flex-shrink: 0;
+    font-size: 2rem;
+    filter: drop-shadow(0 5px 7px rgba(15, 23, 42, 0.16));
+}
+
+.compact-weather-current-copy {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+}
+
+.compact-weather-current-copy > span:first-child {
+    display: flex;
+    align-items: baseline;
+    gap: 0.48rem;
+}
+
+.compact-weather-temperature {
+    font-size: 1.9rem;
+    font-weight: 950;
+    letter-spacing: -0.055em;
+    line-height: 1;
+}
+
+.compact-weather-current-copy small {
+    font-size: 0.57rem;
+    font-weight: 800;
+}
+
+.compact-weather-location {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.32rem;
+    margin-top: 0.28rem;
+}
+
+.compact-weather-location > span {
+    overflow: hidden;
+    color: #64748b;
+    font-size: 0.48rem;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dark .compact-weather-location > span {
+    color: #aebdc9;
+}
+
+.compact-weather-location button {
+    flex-shrink: 0;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 999px;
+    padding: 0.1rem 0.38rem;
+    color: #08785b;
+    background: rgba(255, 255, 255, 0.58);
+    font-size: 0.45rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.dark .compact-weather-location button {
+    color: #a7f3d0;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.compact-weather-details {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.compact-weather-details > span {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    border-left: 1px solid rgba(148, 163, 184, 0.2);
+    padding: 0.22rem 0.55rem;
+}
+
+.compact-weather-details small {
+    color: #64748b;
+    font-size: 0.43rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.compact-weather-details strong {
+    margin-top: 0.12rem;
+    font-size: 0.59rem;
+    white-space: nowrap;
+}
+
+.compact-weather-hours {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+}
+
+.compact-weather-hours > div {
+    display: flex;
+    min-width: 2.75rem;
+    flex-direction: column;
+    align-items: center;
+    border-left: 1px solid rgba(148, 163, 184, 0.2);
+    padding: 0.18rem 0.38rem;
+}
+
+.compact-weather-hours small {
+    color: #64748b;
+    font-size: 0.44rem;
+    font-weight: 800;
+}
+
+.compact-weather-hours span {
+    margin: 0.08rem 0;
+    font-size: 0.9rem;
+}
+
+.compact-weather-hours strong {
+    font-size: 0.58rem;
+}
+
+.compact-weather-updated {
+    position: absolute;
+    right: 0.8rem;
+    bottom: 0.27rem;
+    color: #64748b;
+    font-size: 0.4rem;
+    font-weight: 700;
+}
+
+.weather-loading,
+.weather-unavailable {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.65rem !important;
+    color: #536579;
+    font-size: 0.66rem;
+    font-weight: 900;
+}
+
+.weather-loading-dot {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 999px;
+    background: #10b981;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45);
+    animation: weather-loading-pulse 1.6s infinite;
+}
+
+@keyframes weather-loading-pulse {
+    70% {
+        box-shadow: 0 0 0 0.6rem rgba(16, 185, 129, 0);
+    }
+}
+
+.weather-unavailable > span {
+    font-size: 1.7rem;
+}
+
+.weather-unavailable > div:not(.weather-unavailable-actions) {
+    display: flex;
+    flex-direction: column;
+}
+
+.weather-unavailable strong {
+    font-size: 0.68rem;
+}
+
+.weather-unavailable small {
+    color: #64748b;
+    font-size: 0.5rem;
+}
+
+.weather-unavailable-actions {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.weather-unavailable-actions button {
+    border: 1px solid rgba(16, 185, 129, 0.28);
+    border-radius: 0.65rem;
+    padding: 0.42rem 0.58rem;
+    color: #08785b;
+    background: rgba(255, 255, 255, 0.65);
+    font-size: 0.52rem;
+    font-weight: 900;
+}
+
+/* Modal do endereço */
+
+.weather-location-overlay,
+.quick-links-modal {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 100000 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 1rem !important;
+    background: rgba(7, 17, 21, 0.7) !important;
+    backdrop-filter: blur(13px) !important;
+}
+
+.weather-location-dialog {
+    width: 100%;
+    max-width: 30rem;
+    border: 1px solid rgba(110, 231, 183, 0.34);
+    border-radius: 1.4rem;
+    padding: 1.15rem;
+    color: #172033;
+    background: rgba(255, 255, 255, 0.985);
+    box-shadow: 0 35px 90px -28px rgba(4, 47, 36, 0.72);
+}
+
+.dark .weather-location-dialog {
+    color: #f8fafc;
+    background: rgba(21, 31, 34, 0.985);
+}
+
+.weather-location-dialog header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.weather-location-dialog header span {
+    display: flex;
+    flex-direction: column;
+}
+
+.weather-location-dialog header strong {
+    font-size: 0.9rem;
+    font-weight: 900;
+}
+
+.weather-location-dialog header small {
+    margin-top: 0.22rem;
+    color: #64748b;
+    font-size: 0.66rem;
+}
+
+.weather-location-dialog header button {
+    display: flex;
+    width: 2rem;
+    height: 2rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: #64748b;
+    font-size: 1.25rem;
+}
+
+.weather-location-dialog > input {
+    width: 100%;
+    margin-top: 1rem;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    border-radius: 0.8rem;
+    padding: 0.72rem 0.8rem;
+    outline: none;
+    color: #172033;
+    background: rgba(248, 250, 252, 0.92);
+    font-size: 0.75rem;
+}
+
+.dark .weather-location-dialog > input {
+    color: white;
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.weather-location-dialog > input:focus {
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+}
+
+.weather-location-dialog > p {
+    margin-top: 0.45rem;
+    color: #dc2626;
+    font-size: 0.65rem;
+    font-weight: 700;
+}
+
+.weather-location-dialog footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.55rem;
+    margin-top: 1rem;
+}
+
+.weather-location-dialog footer button {
+    border: 1px solid rgba(16, 185, 129, 0.28);
+    border-radius: 0.75rem;
+    padding: 0.58rem 0.75rem;
+    color: #08785b;
+    background: rgba(236, 253, 245, 0.85);
+    font-size: 0.62rem;
+    font-weight: 900;
+}
+
+.weather-location-dialog footer button:last-child {
+    border: 0;
+    color: white;
+    background: linear-gradient(135deg, #10b981, #0f8e72);
+}
+
+/* Modal dos atalhos */
+
+.quick-links-modal > div {
+    max-height: calc(100vh - 2rem);
+    overflow: hidden;
+    border: 1px solid rgba(110, 231, 183, 0.35) !important;
+    background: rgba(255, 255, 255, 0.985) !important;
+    box-shadow: 0 35px 90px -28px rgba(4, 47, 36, 0.72) !important;
+}
+
+.dark .quick-links-modal > div {
+    border-color: rgba(52, 211, 153, 0.22) !important;
+    background: rgba(21, 31, 34, 0.985) !important;
+}
+
+/* Atalhos lado a lado */
+
+@media (min-width: 768px) {
+    .premium-quick-links [class*="grid-cols"],
+    .premium-quick-links .grid {
+        display: grid !important;
+        grid-auto-flow: column !important;
+        grid-auto-columns: minmax(6.25rem, 1fr) !important;
+        grid-template-columns: none !important;
+        gap: 0 !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+    }
+}
+
+@media (max-width: 1180px) {
+    .compact-weather-capsule {
+        grid-template-columns: minmax(10rem, 1fr) auto !important;
+    }
+
+    .compact-weather-details {
+        display: none;
+    }
+}
+
+@media (max-width: 767px) {
+    .pandanet-home-page {
+        min-height: auto !important;
+        padding: 0.7rem !important;
+    }
+
+    .pandanet-home-page::before,
+    .dark .pandanet-home-page::before {
+        background-position: center top !important;
+        background-size: cover !important;
+    }
+
+    .compact-weather-capsule {
+        grid-template-columns: 1fr !important;
+    }
+
+    .compact-weather-hours {
+        justify-content: space-between;
+    }
+
+    .weather-location-dialog footer {
+        flex-direction: column;
+    }
+}
+
+/* FIM PANDA NET HOME — AJUSTES V7 */
+
+
+/* PANDA NET HOME — BACKGROUND SEPARADO V8 */
+
+/*
+ * A página deixa de usar uma única imagem esticada.
+ * Cada área recebe seu próprio recorte proporcional.
+ */
+
+.pandanet-home-page {
+    padding:
+        clamp(1rem, 1.55vw, 1.65rem)
+        clamp(0.8rem, 1.35vw, 1.45rem)
+        clamp(1.2rem, 1.75vw, 1.9rem) !important;
+    background:
+        linear-gradient(
+            145deg,
+            #eef4f1,
+            #e6f0ec 48%,
+            #dcebe5
+        ) !important;
+}
+
+.dark .pandanet-home-page {
+    background:
+        linear-gradient(
+            145deg,
+            #111b1d,
+            #152321 48%,
+            #10201e
+        ) !important;
+}
+
+.pandanet-home-page::before,
+.pandanet-home-page::after,
+.dark .pandanet-home-page::before,
+.dark .pandanet-home-page::after {
+    display: none !important;
+    content: none !important;
+    background: none !important;
+}
+
+.pandanet-home-page .premium-daily-shell {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: inherit !important;
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+}
+
+.pandanet-home-page .premium-daily-shell::before,
+.pandanet-home-page .premium-daily-shell::after {
+    display: none !important;
+    content: none !important;
+}
+
+/* Área principal: saudação, clima e três colunas */
+
+.premium-daily-main-zone {
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
+    border:
+        1px solid rgba(128, 162, 148, 0.28);
+    border-radius: 2rem;
+    padding:
+        clamp(1.25rem, 2vw, 2.15rem)
+        clamp(1.15rem, 1.8vw, 1.95rem)
+        clamp(1.35rem, 2.1vw, 2.25rem);
+    background-image:
+        linear-gradient(
+            90deg,
+            rgba(245, 248, 246, 0.3),
+            rgba(235, 246, 241, 0.16)
+        ),
+        url("/home-panda-background.png");
+    background-repeat: no-repeat;
+    background-position: center center;
+    background-size: cover;
+    box-shadow:
+        0 30px 75px -42px rgba(28, 73, 60, 0.56);
+    isolation: isolate;
+}
+
+.premium-daily-main-zone::before {
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    content: "";
+    pointer-events: none;
+    background:
+        radial-gradient(
+            circle at 48% 9%,
+            rgba(255, 255, 255, 0.25),
+            transparent 34%
+        ),
+        linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.04),
+            rgba(228, 242, 235, 0.08)
+        );
+}
+
+.dark .premium-daily-main-zone {
+    border-color: rgba(52, 211, 153, 0.13);
+    background-image:
+        linear-gradient(
+            90deg,
+            rgba(13, 24, 26, 0.69),
+            rgba(15, 35, 31, 0.62)
+        ),
+        url("/home-panda-background.png");
+    background-position: center center;
+    background-size: cover;
+    box-shadow:
+        0 30px 80px -42px rgba(0, 0, 0, 0.85);
+}
+
+.dark .premium-daily-main-zone::before {
+    background:
+        radial-gradient(
+            circle at 48% 9%,
+            rgba(93, 155, 132, 0.08),
+            transparent 35%
+        ),
+        linear-gradient(
+            180deg,
+            rgba(13, 23, 26, 0.08),
+            rgba(5, 14, 17, 0.28)
+        );
+}
+
+.premium-daily-main-zone .premium-daily-heading {
+    position: relative;
+    z-index: 2;
+}
+
+.premium-daily-main-zone .premium-daily-bento {
+    position: relative;
+    z-index: 2;
+    margin-top: 1.3rem !important;
+}
+
+/*
+ * Faixa inferior independente:
+ * acessos rápidos e indicadores.
+ */
+
+.premium-daily-footer {
+    position: relative;
+    z-index: 1;
+    overflow: hidden !important;
+    border:
+        1px solid rgba(128, 162, 148, 0.28);
+    border-radius: 1.75rem;
+    padding: 1rem !important;
+    margin-top: 1rem !important;
+    background-image:
+        linear-gradient(
+            90deg,
+            rgba(248, 251, 249, 0.42),
+            rgba(232, 245, 239, 0.25)
+        ),
+        url("/home-panda-background.png");
+    background-repeat: no-repeat;
+    background-position: center 82%;
+    background-size: cover;
+    box-shadow:
+        0 24px 60px -38px rgba(28, 73, 60, 0.54);
+    isolation: isolate;
+}
+
+.premium-daily-footer::before {
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    content: "";
+    pointer-events: none;
+    background:
+        linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0.15),
+            rgba(224, 242, 233, 0.08)
+        );
+}
+
+.dark .premium-daily-footer {
+    border-color: rgba(52, 211, 153, 0.13);
+    background-image:
+        linear-gradient(
+            90deg,
+            rgba(13, 24, 26, 0.68),
+            rgba(15, 35, 31, 0.6)
+        ),
+        url("/home-panda-background.png");
+    background-position: center 82%;
+    background-size: cover;
+}
+
+.dark .premium-daily-footer::before {
+    background:
+        linear-gradient(
+            90deg,
+            rgba(10, 21, 23, 0.14),
+            rgba(5, 14, 17, 0.28)
+        );
+}
+
+/*
+ * As caixas internas continuam translúcidas para que cada
+ * background fique visível sem prejudicar a leitura.
+ */
+
+.premium-daily-main-zone .premium-priority-card,
+.premium-daily-main-zone .premium-project-card,
+.premium-daily-main-zone .premium-tomorrow-card,
+.premium-daily-footer .premium-quick-links,
+.premium-daily-footer .premium-stat-card {
+    background:
+        rgba(253, 254, 253, 0.88) !important;
+    backdrop-filter: blur(17px) !important;
+}
+
+.dark .premium-daily-main-zone .premium-priority-card,
+.dark .premium-daily-main-zone .premium-project-card,
+.dark .premium-daily-main-zone .premium-tomorrow-card,
+.dark .premium-daily-footer .premium-quick-links,
+.dark .premium-daily-footer .premium-stat-card {
+    background:
+        rgba(20, 34, 34, 0.9) !important;
+}
+
+/* Evita que o background seja deformado em telas menores */
+
+@media (max-width: 1180px) {
+    .premium-daily-main-zone,
+    .premium-daily-footer {
+        background-position: center center;
+        background-size: cover;
+    }
+
+    .premium-daily-main-zone {
+        padding: 1.2rem;
+    }
+}
+
+@media (max-width: 767px) {
+    .pandanet-home-page {
+        padding: 0.65rem !important;
+    }
+
+    .premium-daily-main-zone {
+        border-radius: 1.35rem;
+        padding: 0.9rem;
+        background-position: center top;
+    }
+
+    .premium-daily-footer {
+        border-radius: 1.25rem;
+        padding: 0.7rem !important;
+        background-position: center bottom;
+    }
+}
+
+/* FIM PANDA NET HOME — BACKGROUND SEPARADO V8 */
+
+/* PANDA NET — NORMALIZAÇÃO SEGURA V2 */
+
+/*
+ * O background pertence exclusivamente à página.
+ * Nenhum form, input, modal ou painel herda a imagem.
+ */
+.pandanet-page:not([data-page="home"]) {
+    position: relative;
+    isolation: isolate;
+
+    background-color: #eef4f2;
+    background-image:
+        linear-gradient(
+            rgba(244, 248, 247, 0.84),
+            rgba(235, 244, 241, 0.88)
+        ),
+        url("/home-panda-background.png");
+    background-repeat: no-repeat;
+    background-position: center center;
+    background-size: cover;
+    background-attachment: local;
+}
+
+.dark .pandanet-page:not([data-page="home"]) {
+    background-color: #10191c;
+    background-image:
+        linear-gradient(
+            rgba(8, 18, 22, 0.87),
+            rgba(12, 27, 27, 0.91)
+        ),
+        url("/home-panda-background.png");
+}
+
+/*
+ * Somente proteções estruturais globais.
+ * Nenhuma cor ou posição dos formulários é sobrescrita.
+ */
+.pandanet-page form,
+.pandanet-page fieldset,
+.pandanet-page input,
+.pandanet-page select,
+.pandanet-page textarea {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.pandanet-page textarea {
+    resize: vertical;
+}
+
+html:not(.dark) {
+    color-scheme: light;
+}
+
+html.dark {
+    color-scheme: dark;
+}
+
+/*
+ * Modal do Marketplace: camada simétrica em todos os lados.
+ */
+.marketplace-modal-viewport {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 10050 !important;
+
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    min-width: 100vw !important;
+    min-height: 100vh !important;
+    min-height: 100dvh !important;
+    max-width: none !important;
+    max-height: none !important;
+
+    margin: 0 !important;
+    padding: clamp(14px, 2.5vw, 36px) !important;
+
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+
+    background:
+        rgba(5, 15, 23, 0.72) !important;
+
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+}
+
+/*
+ * Painel centralizado.
+ */
+.marketplace-modal-viewport > div {
+    position: relative !important;
+    inset: auto !important;
+
+    width: min(960px, 100%) !important;
+    height: auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-width: 960px !important;
+    max-height: calc(100dvh - 40px) !important;
+
+    margin: auto !important;
+    padding: clamp(20px, 2.5vw, 32px) !important;
+
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+
+    color: #172033 !important;
+    background-color: #ffffff !important;
+    background-image: none !important;
+
+    border:
+        1px solid
+        rgba(15, 118, 110, 0.20) !important;
+    border-radius: 22px !important;
+
+    box-shadow:
+        0 28px 70px rgba(2, 15, 23, 0.34),
+        0 8px 22px rgba(2, 15, 23, 0.14) !important;
+
+    transform: none !important;
+}
+
+/*
+ * O modal de detalhes pode ter duas colunas.
+ */
+.marketplace-modal-viewport > div.flex-row,
+.marketplace-modal-viewport > div.md\:flex-row {
+    padding: 0 !important;
+}
+
+/*
+ * Formulários internos transparentes sobre o painel.
+ */
+.marketplace-modal-viewport form {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+
+    color: inherit !important;
+    background: transparent !important;
+    background-image: none !important;
+}
+
+/* Contraste do modo claro. */
+.marketplace-modal-viewport h1,
+.marketplace-modal-viewport h2,
+.marketplace-modal-viewport h3,
+.marketplace-modal-viewport h4,
+.marketplace-modal-viewport label {
+    color: #172033 !important;
+}
+
+.marketplace-modal-viewport p,
+.marketplace-modal-viewport small {
+    color: #64748b;
+}
+
+.marketplace-modal-viewport input:not([type="checkbox"]):not([type="radio"]),
+.marketplace-modal-viewport select,
+.marketplace-modal-viewport textarea {
+    width: 100% !important;
+
+    color: #172033 !important;
+    caret-color: #059669;
+
+    background-color: #ffffff !important;
+    background-image: none !important;
+
+    border:
+        1px solid
+        #cbd5e1 !important;
+
+    box-shadow: none !important;
+}
+
+.marketplace-modal-viewport input::placeholder,
+.marketplace-modal-viewport textarea::placeholder {
+    color: #94a3b8 !important;
+    opacity: 1;
+}
+
+.marketplace-modal-viewport select option {
+    color: #172033;
+    background: #ffffff;
+}
+
+.marketplace-modal-viewport input[type="file"] {
+    color: #475569 !important;
+    background-color: #ffffff !important;
+}
+
+/* Contraste do modo escuro. */
+.dark .marketplace-modal-viewport {
+    background:
+        rgba(1, 8, 13, 0.84) !important;
+}
+
+.dark .marketplace-modal-viewport > div {
+    color: #e8eef5 !important;
+    background-color: #101d22 !important;
+    background-image: none !important;
+
+    border-color:
+        rgba(52, 211, 153, 0.24) !important;
+
+    box-shadow:
+        0 30px 80px rgba(0, 0, 0, 0.58),
+        0 8px 24px rgba(0, 0, 0, 0.28) !important;
+}
+
+.dark .marketplace-modal-viewport h1,
+.dark .marketplace-modal-viewport h2,
+.dark .marketplace-modal-viewport h3,
+.dark .marketplace-modal-viewport h4,
+.dark .marketplace-modal-viewport label {
+    color: #f1f5f9 !important;
+}
+
+.dark .marketplace-modal-viewport p,
+.dark .marketplace-modal-viewport small {
+    color: #a8b5c4;
+}
+
+.dark .marketplace-modal-viewport input:not([type="checkbox"]):not([type="radio"]),
+.dark .marketplace-modal-viewport select,
+.dark .marketplace-modal-viewport textarea {
+    color: #eef4f8 !important;
+    caret-color: #34d399;
+
+    background-color: #0c1a2b !important;
+    background-image: none !important;
+
+    border-color:
+        #34465b !important;
+}
+
+.dark .marketplace-modal-viewport input::placeholder,
+.dark .marketplace-modal-viewport textarea::placeholder {
+    color: #8291a5 !important;
+}
+
+.dark .marketplace-modal-viewport select {
+    color-scheme: dark;
+}
+
+.dark .marketplace-modal-viewport select option {
+    color: #eef4f8;
+    background: #0c1a2b;
+}
+
+.dark .marketplace-modal-viewport input[type="file"] {
+    color: #dbe5ef !important;
+    background-color: #0c1a2b !important;
+}
+
+/*
+ * Botão de fechamento com contraste nos dois temas.
+ */
+.marketplace-modal-viewport button.text-gray-400 {
+    color: #64748b !important;
+}
+
+.dark .marketplace-modal-viewport button.text-gray-400 {
+    color: #a8b5c4 !important;
+}
+
+/* Tablets. */
+@media (max-width: 1023px) {
+    .marketplace-modal-viewport {
+        align-items: flex-start !important;
+        padding: 74px 14px 18px !important;
+    }
+
+    .marketplace-modal-viewport > div {
+        width: 100% !important;
+        max-height: calc(100dvh - 92px) !important;
+        border-radius: 18px !important;
+    }
+}
+
+/* Celulares. */
+@media (max-width: 639px) {
+    .marketplace-modal-viewport {
+        padding: 64px 8px 10px !important;
+    }
+
+    .marketplace-modal-viewport > div {
+        max-height: calc(100dvh - 74px) !important;
+        padding: 18px 14px !important;
+        border-radius: 15px !important;
+    }
+
+    .marketplace-modal-viewport > div.flex-row,
+    .marketplace-modal-viewport > div.md\:flex-row {
+        padding: 0 !important;
+    }
+}
+
+/* FIM — NORMALIZAÇÃO SEGURA V2 */

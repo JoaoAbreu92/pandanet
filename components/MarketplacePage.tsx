@@ -102,7 +102,7 @@ const SellItemModal: React.FC<{ onClose: () => void; onAddItem: () => void; curr
     };
 
     return (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+        <div className="marketplace-modal-viewport fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg relative animate-fade-in-up max-h-[90vh] overflow-y-auto">
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
                     <XCircleIcon className="w-6 h-6" />
@@ -229,7 +229,7 @@ const ItemDetailModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+        <div className="marketplace-modal-viewport fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
             <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col md:flex-row animate-fade-in-up" onClick={e => e.stopPropagation()}>
                 <div className="w-full md:w-1/2 relative bg-gray-100 flex items-center justify-center">
                     {item.imageUrls.length > 0 ? (
@@ -402,7 +402,7 @@ const EditItemModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+        <div className="marketplace-modal-viewport fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg relative animate-fade-in-up max-h-[90vh] overflow-y-auto">
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
                     <XCircleIcon className="w-6 h-6" />
