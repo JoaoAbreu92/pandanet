@@ -1236,14 +1236,24 @@ const AppContent: React.FC = () => {
         if (ghostAuditActive) return true;
 
         if (!currentUser) return false;
-        if (currentUser.role === 'Super Admin') return true;
+        if (
+            currentUser.role === 'Super Admin'
+            || currentUser.isAdmin
+            || currentUser.isCompanyAdmin
+        ) return true;
 
         if (permission === 'viewWhatsPanda') {
-            const hasWhatsPanda = !!currentUser.is_whatsapp_agent ||
-                (!!currentUser.whatspanda_permissions && Object.keys(currentUser.whatspanda_permissions).length > 0) ||
-                (currentUser.permissions && (currentUser.permissions as any).viewWhatsPanda === true);
+            const explicitModulePermission = currentUser.permissions?.viewWhatsPanda;
+            const hasWhatsPanda = explicitModulePermission === false
+                ? false
+                : explicitModulePermission === true
+                    || !!currentUser.is_whatsapp_agent
+                    || (
+                        !!currentUser.whatspanda_permissions
+                        && Object.keys(currentUser.whatspanda_permissions).length > 0
+                    );
             if (!hasWhatsPanda) return false;
-        } else if (currentUser.permissions?.[permission] === false) {
+        } else if (currentUser.permissions?.[permission] !== true) {
             return false;
         }
 
@@ -1289,6 +1299,60 @@ const AppContent: React.FC = () => {
 
     const renderPage = () => {
         if (!currentUser || !companyData) return null;
+
+        const hasDelegatedAdminAccess = Object.entries(
+            currentUser.permissions || {}
+        ).some(([key, value]) => (
+            (key.startsWith('admin_view_') || key.startsWith('admin_tab_'))
+            && value === true
+        ));
+
+        const pagePermissionMap: Partial<Record<Page, keyof EmployeePermissions>> = {
+            messages: 'viewMessages',
+            email: 'viewEmail',
+            calendar: 'viewCalendar',
+            events: 'viewEvents',
+            marketplace: 'useMarketplace',
+            directory: 'viewDirectory',
+            documentos: 'viewDocuments',
+            recognition: 'viewRecognition',
+            forms: 'viewForms',
+            benefits: 'viewBenefits',
+            'bem-estar': 'viewWellbeing',
+            onboarding: 'viewOnboarding',
+            'ti-dashboard': 'viewTiDashboard',
+            'ti-requests': 'openTiRequests',
+            tickets: 'openTickets',
+            training: 'viewTraining',
+            surveys: 'viewSurveys',
+            policies: 'viewPolicies',
+            'knowledge-base': 'viewKnowledgeBase',
+            'service-status': 'viewServiceStatus',
+            infosec: 'viewInfoSec',
+            jobs: 'viewJobs',
+            'meu-rh': 'viewMeuRH',
+            'org-chart': 'viewOrgChart',
+            'kpi-dashboard': 'viewKPIDashboard',
+            projects: 'viewProjects',
+            'projects-planning': 'viewProjects',
+            'projects-list': 'viewProjects',
+            'projects-calendar': 'viewProjects',
+            'projects-metrics': 'viewProjects',
+            whatspanda: 'viewWhatsPanda',
+            scheduling: 'viewScheduling',
+            'scheduling-events': 'viewScheduling',
+            agenda: 'viewAgenda',
+            reservas: 'viewReservations'
+        };
+
+        const requiredPermission = pagePermissionMap[currentPage];
+        if (requiredPermission && !canAccess(requiredPermission)) {
+            return (
+                <div className="p-8 text-center text-red-600 font-extrabold">
+                    Acesso negado: você não possui permissão para este módulo.
+                </div>
+            );
+        }
 
         const requiredFeature = PAGE_FEATURE_MAP[currentPage];
         if (
@@ -1343,7 +1407,7 @@ const AppContent: React.FC = () => {
                             Área restrita.
                         </p>
                     );
-            case 'admin': return (currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin') && (currentCompany && currentCompany.plan) ? <AdminPage company={currentCompany} setCompany={handleSetCompanyForAdmin} plan={currentCompany.plan} customFeatures={mergedFeatures} onNavigate={handleNavigate} isCompanyAdministrator={currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin'} /> : <p className="p-8 text-center text-red-600">Acesso negado ou empresa não carregada.</p>;
+            case 'admin': return (currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin' || hasDelegatedAdminAccess) && (currentCompany && currentCompany.plan) ? <AdminPage company={currentCompany} setCompany={handleSetCompanyForAdmin} plan={currentCompany.plan} customFeatures={mergedFeatures} onNavigate={handleNavigate} isCompanyAdministrator={currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin'} /> : <p className="p-8 text-center text-red-600">Acesso negado ou empresa não carregada.</p>;
             case 'training': return canAccess('viewTraining') ? <TrainingPage /> : null;
             case 'surveys': return canAccess('viewSurveys') ? <SurveysPage /> : null;
             case 'policies': return canAccess('viewPolicies') ? <PoliciesPage /> : null;

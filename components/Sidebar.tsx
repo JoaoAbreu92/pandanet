@@ -156,12 +156,19 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             permission === 'viewWhatsPanda'
             && !ghostSuperAdmin
         ) {
-            const hasWhatsPanda = !!currentUser.is_whatsapp_agent ||
-                (!!currentUser.whatspanda_permissions && Object.keys(currentUser.whatspanda_permissions).length > 0) ||
-                (currentUser.permissions && (currentUser.permissions as any).viewWhatsPanda === true);
-            if (hasWhatsPanda) {
-                hasPermission = true;
-            }
+            const explicitModulePermission = currentUser.permissions?.viewWhatsPanda;
+
+            // A permissão principal do módulo sempre prevalece. As permissões
+            // internas só podem manter compatibilidade com usuários antigos
+            // quando viewWhatsPanda ainda não foi gravada.
+            hasPermission = explicitModulePermission === false
+                ? false
+                : explicitModulePermission === true
+                    || !!currentUser.is_whatsapp_agent
+                    || (
+                        !!currentUser.whatspanda_permissions
+                        && Object.keys(currentUser.whatspanda_permissions).length > 0
+                    );
         }
 
         if (!isAdmin && !hasPermission) {
@@ -363,7 +370,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     <NavItem page="agenda" label="Treinamentos" icon={PlayIcon} permission="viewAgenda" featureId="new_agenda" context={{ tab: 'trainings' }} />
                 </NavMenu>
                 <NavItem page="reservas" label="Reservas" icon={BuildingOfficeIcon} permission="viewReservations" featureId="reservations" />
-                <NavItem page="events" label={t('sidebar.events')} icon={CalendarDaysIcon} permission={true} featureId="events" />
+                <NavItem page="events" label={t('sidebar.events')} icon={CalendarDaysIcon} permission="viewEvents" featureId="events" />
                 <NavMenu label={t('sidebar.projects')} icon={ClipboardDocumentCheckIcon} menuKey="projects" permission={ghostSuperAdmin || !!currentUser.permissions.viewProjects} featureId="projects">
                     <NavItem page="projects" label="Painel de Controle" icon={ClipboardDocumentCheckIcon} permission="viewProjects" featureId="projects" />
                     {hasSelectedProject && (

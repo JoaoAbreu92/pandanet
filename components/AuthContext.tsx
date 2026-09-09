@@ -208,7 +208,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             viewEmployeeDetails: true, editEmployeeProfile: true, deleteEmployeeProfile: true,
                             viewVacationRequests: true, manageVacationRequests: true,
                             viewJobs: true, manageJobs: true, viewMeuRH: true, viewOrgChart: true, viewKPIDashboard: true, manageKPIs: true,
-                            ai_assistant: true, viewScheduling: true, viewAgenda: true, viewReservations: true,
+                            ai_assistant: true, viewScheduling: true, viewAgenda: true, viewEvents: true, viewReservations: true,
                             viewTimeBank: true, manageTimeBank: true, viewEmployeeBenefitsAdmin: true, viewPerformance: true, managePerformance: true
                         },
                         following: [],
@@ -259,25 +259,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 viewEmployeeDetails: true, editEmployeeProfile: true, deleteEmployeeProfile: true,
                 viewVacationRequests: true, manageVacationRequests: true,
                 viewJobs: true, manageJobs: true, viewMeuRH: true, viewOrgChart: true, viewKPIDashboard: true, manageKPIs: true,
-                viewScheduling: true, viewAgenda: true, viewReservations: true,
+                viewScheduling: true, viewAgenda: true, viewEvents: true, viewReservations: true,
                 viewTimeBank: true, manageTimeBank: true, viewEmployeeBenefitsAdmin: true, viewPerformance: true, managePerformance: true,
                 admin_view_dp: true, admin_view_gestao_rh: true, admin_view_administrativo: true
             };
 
             const defaultEmployeePermissions = {
-                viewMessages: true, viewCalendar: true, useMarketplace: true,
+                viewMessages: true, viewCalendar: false, useMarketplace: false,
                 canPostText: true, canPostImage: true, canPostVideo: true,
-                viewDirectory: true, viewForms: true, viewBenefits: true,
-                viewOnboarding: true, viewRecognition: true, viewDocuments: true, viewWellbeing: true,
-                viewTiDashboard: false, openTickets: true, openTiRequests: true,
-                viewTraining: true, viewSurveys: true, viewPolicies: true,
-                viewKnowledgeBase: true, viewServiceStatus: true, viewInfoSec: true,
-                createEvents: false, manageMarketplace: false, viewEmail: true, viewWhatsPanda: false, viewProjects: true,
+                viewDirectory: false, viewForms: false, viewBenefits: false,
+                viewOnboarding: false, viewRecognition: false, viewDocuments: false, viewWellbeing: false,
+                viewTiDashboard: false, openTickets: false, openTiRequests: false,
+                viewTraining: false, viewSurveys: false, viewPolicies: false,
+                viewKnowledgeBase: false, viewServiceStatus: false, viewInfoSec: false,
+                createEvents: false, manageMarketplace: false, viewEmail: true, viewWhatsPanda: false, viewProjects: false,
                 viewEmployeeDetails: false, editEmployeeProfile: false, deleteEmployeeProfile: false,
                 viewVacationRequests: false, manageVacationRequests: false,
-                viewJobs: true, manageJobs: false, viewMeuRH: true, viewOrgChart: true, viewKPIDashboard: true, manageKPIs: false,
-                viewScheduling: true, viewAgenda: true, viewReservations: true,
-                viewTimeBank: true, manageTimeBank: false, viewEmployeeBenefitsAdmin: false, viewPerformance: true, managePerformance: false,
+                viewJobs: false, manageJobs: false, viewMeuRH: false, viewOrgChart: false, viewKPIDashboard: false, manageKPIs: false,
+                viewScheduling: false, viewAgenda: false, viewEvents: false, viewReservations: false,
+                viewTimeBank: false, manageTimeBank: false, viewEmployeeBenefitsAdmin: false, viewPerformance: false, managePerformance: false,
                 admin_view_dp: false, admin_view_gestao_rh: false, admin_view_administrativo: false
             };
 

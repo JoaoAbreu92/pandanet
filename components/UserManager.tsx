@@ -119,34 +119,35 @@ const UserFormModal: React.FC<{
         department_id: user?.department_id || '',
         permissions: {
             viewMessages: user?.permissions?.viewMessages ?? true,
-            viewCalendar: user?.permissions?.viewCalendar ?? true,
-            useMarketplace: user?.permissions?.useMarketplace ?? true,
+            viewCalendar: user?.permissions?.viewCalendar ?? false,
+            useMarketplace: user?.permissions?.useMarketplace ?? false,
             viewEmail: user?.permissions?.viewEmail ?? true,
             viewWhatsPanda: user?.permissions?.viewWhatsPanda ?? (user?.is_whatsapp_agent ?? false),
-            viewScheduling: user?.permissions?.viewScheduling ?? true,
-            viewDirectory: user?.permissions?.viewDirectory ?? true,
-            viewForms: user?.permissions?.viewForms ?? true,
-            viewBenefits: user?.permissions?.viewBenefits ?? true,
-            viewOnboarding: user?.permissions?.viewOnboarding ?? true,
-            viewRecognition: user?.permissions?.viewRecognition ?? true,
-            viewDocuments: user?.permissions?.viewDocuments ?? true,
-            viewTraining: user?.permissions?.viewTraining ?? true,
-            viewSurveys: user?.permissions?.viewSurveys ?? true,
-            viewPolicies: user?.permissions?.viewPolicies ?? true,
-            viewWellbeing: user?.permissions?.viewWellbeing ?? true,
-            viewMeuRH: user?.permissions?.viewMeuRH ?? true,
-            viewJobs: user?.permissions?.viewJobs ?? true,
-            viewOrgChart: user?.permissions?.viewOrgChart ?? true,
-            viewKPIDashboard: user?.permissions?.viewKPIDashboard ?? true,
+            viewScheduling: user?.permissions?.viewScheduling ?? false,
+            viewDirectory: user?.permissions?.viewDirectory ?? false,
+            viewForms: user?.permissions?.viewForms ?? false,
+            viewBenefits: user?.permissions?.viewBenefits ?? false,
+            viewOnboarding: user?.permissions?.viewOnboarding ?? false,
+            viewRecognition: user?.permissions?.viewRecognition ?? false,
+            viewDocuments: user?.permissions?.viewDocuments ?? false,
+            viewTraining: user?.permissions?.viewTraining ?? false,
+            viewSurveys: user?.permissions?.viewSurveys ?? false,
+            viewPolicies: user?.permissions?.viewPolicies ?? false,
+            viewWellbeing: user?.permissions?.viewWellbeing ?? false,
+            viewMeuRH: user?.permissions?.viewMeuRH ?? false,
+            viewJobs: user?.permissions?.viewJobs ?? false,
+            viewOrgChart: user?.permissions?.viewOrgChart ?? false,
+            viewKPIDashboard: user?.permissions?.viewKPIDashboard ?? false,
             manageKPIs: user?.permissions?.manageKPIs ?? false,
-            viewReservations: user?.permissions?.viewReservations ?? true,
-            viewAgenda: user?.permissions?.viewAgenda ?? true,
+            viewReservations: user?.permissions?.viewReservations ?? false,
+            viewAgenda: user?.permissions?.viewAgenda ?? false,
+            viewEvents: user?.permissions?.viewEvents ?? false,
             viewTiDashboard: user?.permissions?.viewTiDashboard ?? false,
-            openTickets: user?.permissions?.openTickets ?? true,
-            openTiRequests: user?.permissions?.openTiRequests ?? true,
-            viewKnowledgeBase: user?.permissions?.viewKnowledgeBase ?? true,
-            viewServiceStatus: user?.permissions?.viewServiceStatus ?? true,
-            viewInfoSec: user?.permissions?.viewInfoSec ?? true,
+            openTickets: user?.permissions?.openTickets ?? false,
+            openTiRequests: user?.permissions?.openTiRequests ?? false,
+            viewKnowledgeBase: user?.permissions?.viewKnowledgeBase ?? false,
+            viewServiceStatus: user?.permissions?.viewServiceStatus ?? false,
+            viewInfoSec: user?.permissions?.viewInfoSec ?? false,
             createEvents: user?.permissions?.createEvents ?? false,
             manageMarketplace: user?.permissions?.manageMarketplace ?? false,
             viewEmployeeDetails: user?.permissions?.viewEmployeeDetails ?? false,
@@ -160,11 +161,11 @@ const UserFormModal: React.FC<{
             retainFeedPosts: user?.permissions?.retainFeedPosts ?? false,
             canSendChatAttachments: user?.permissions?.canSendChatAttachments ?? true,
             chatAttachmentMaxMb: user?.permissions?.chatAttachmentMaxMb ?? 10,
-            viewProjects: user?.permissions?.viewProjects ?? true,
-            viewTimeBank: user?.permissions?.viewTimeBank ?? true,
+            viewProjects: user?.permissions?.viewProjects ?? false,
+            viewTimeBank: user?.permissions?.viewTimeBank ?? false,
             manageTimeBank: user?.permissions?.manageTimeBank ?? false,
             viewEmployeeBenefitsAdmin: user?.permissions?.viewEmployeeBenefitsAdmin ?? false,
-            viewPerformance: user?.permissions?.viewPerformance ?? true,
+            viewPerformance: user?.permissions?.viewPerformance ?? false,
             managePerformance: user?.permissions?.managePerformance ?? false,
             admin_view_dp: user?.permissions?.admin_view_dp ?? false,
             admin_view_gestao_rh: user?.permissions?.admin_view_gestao_rh ?? false,
@@ -200,8 +201,8 @@ const UserFormModal: React.FC<{
             admin_tab_scheduling: user?.permissions?.admin_tab_scheduling ?? false,
             admin_tab_scheduling_events: user?.permissions?.admin_tab_scheduling_events ?? false,
             admin_tab_settings: user?.permissions?.admin_tab_settings ?? false,
-            action_view_holerite: user?.permissions?.action_view_holerite ?? true,
-            action_register_hours: user?.permissions?.action_register_hours ?? true,
+            action_view_holerite: user?.permissions?.action_view_holerite ?? false,
+            action_register_hours: user?.permissions?.action_register_hours ?? false,
             action_approve_reservations: user?.permissions?.action_approve_reservations ?? false,
         },
         // Personal Data
@@ -217,13 +218,13 @@ const UserFormModal: React.FC<{
         nudge_cooldown: user?.nudge_cooldown ?? 30,
         is_whatsapp_agent: user?.is_whatsapp_agent ?? false,
         whatspanda_permissions: user?.whatspanda_permissions || {
-            can_view_contacts: true,
+            can_view_contacts: false,
             can_edit_contacts: false,
-            can_view_chats: true,
-            can_send_messages: true,
-            can_send_media: true,
+            can_view_chats: false,
+            can_send_messages: false,
+            can_send_media: false,
             can_manage_settings: false,
-            can_view_groups: true,
+            can_view_groups: false,
         },
         email_permissions: user?.email_permissions || {
             can_manage_accounts: false,
@@ -598,8 +599,10 @@ const UserFormModal: React.FC<{
                                     </h5>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Calendário" name="viewCalendar" checked={formData.permissions.viewCalendar} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                        <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Agenda (Agendamentos e Eventos)" name="viewScheduling" checked={formData.permissions.viewScheduling} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
-                                        <PermissionToggle icon={<UsersIcon className="w-4 h-4" />} label="Diretório de Pessoas" name="viewDirectory" checked={formData.permissions.viewDirectory} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                            <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Agenda (Agendamentos e Eventos)" name="viewScheduling" checked={formData.permissions.viewScheduling} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                            <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Agendar (Visitas, Reuniões e Treinamentos)" name="viewAgenda" checked={formData.permissions.viewAgenda} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                            <PermissionToggle icon={<CalendarDaysIcon className="w-4 h-4" />} label="Eventos da Empresa" name="viewEvents" checked={formData.permissions.viewEvents} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                            <PermissionToggle icon={<UsersIcon className="w-4 h-4" />} label="Diretório de Pessoas" name="viewDirectory" checked={formData.permissions.viewDirectory} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                         <PermissionToggle icon={<DocumentTextIcon className="w-4 h-4" />} label="Formulários" name="viewForms" checked={formData.permissions.viewForms} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                         <PermissionToggle icon={<HeartIcon className="w-4 h-4" />} label="Benefícios" name="viewBenefits" checked={formData.permissions.viewBenefits} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                         <PermissionToggle icon={<RocketLaunchIcon className="w-4 h-4" />} label="Onboarding" name="viewOnboarding" checked={formData.permissions.viewOnboarding} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
@@ -669,7 +672,14 @@ const UserFormModal: React.FC<{
                                                     label="Agente WhatsPanda" 
                                                     name="is_whatsapp_agent" 
                                                     checked={formData.is_whatsapp_agent} 
-                                                    onChange={(n, c) => setFormData(p => ({ ...p, [n]: c }))} 
+                                                    onChange={(_, checked) => setFormData(previous => ({
+                                                        ...previous,
+                                                        is_whatsapp_agent: checked,
+                                                        permissions: {
+                                                            ...previous.permissions,
+                                                            viewWhatsPanda: checked
+                                                        }
+                                                    }))}
                                                 />
                                             </div>
 

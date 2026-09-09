@@ -1583,81 +1583,21 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                 }
             }
 
-            // 1. Verificar se já existe uma conversa 1:1 entre esses usuários (Lógica padrão)
-            const { data: participations, error: partError } = await supabase
-                .from('conversation_participants')
-                .select('conversation_id')
-                .eq('user_id', currentUser.id);
-
-            if (partError) throw partError;
-
-            const myConvIds = participations.map(p => p.conversation_id);
-
-            if (myConvIds.length > 0) {
-                const { data: commonPart, error: commonError } = await supabase
-                    .from('conversation_participants')
-                    .select('conversation_id, user_id')
-                    .in('conversation_id', myConvIds)
-                    .eq('user_id', contactId);
-
-                if (commonPart && commonPart.length > 0) {
-                    // Verificar se alguma dessas conversas em comum NÃO é grupo (é 1:1)
-                    const sharedConvIds = commonPart.map(c => c.conversation_id);
-
-                    const { data: convs, error: checkConvError } = await supabase
-                        .from('conversations')
-                        .select('id, is_closed')
-                        .in('id', sharedConvIds)
-                        .eq('is_group', false)
-                        .limit(1)
-                        .maybeSingle();
-
-                    if (checkConvError) {
-                        console.error("Erro verificando conversas em comum:", checkConvError);
-                    }
-
-                    if (convs) {
-                        // Se estiver fechado (seja suporte ou interna), reabre ao iniciar
-                        if (convs.is_closed) {
-                            await supabase
-                                .from('conversations')
-                                .update({ is_closed: false })
-                                .eq('id', convs.id);
-                        }
-
-                        setSelectedConversationId(convs.id);
-                        setActiveTab('conversations');
-                        setLoading(false);
-                        return;
-                    }
-                }
-            }
-
-            // 2. Se não existe, criar nova conversa
-            const { data: newConv, error: createError } = await supabase
-                .from('conversations')
-                .insert({
-                    company_id: currentUser.company_id,
-                    is_group: false,
-                    last_message: 'Conversa iniciada',
-                    last_message_at: new Date().toISOString(),
-                    created_by: currentUser.id
-                })
-                .select()
-                .single();
+            // A criação padrão é feita no banco em uma única transação. Isso
+            // impede conversas sem participantes e aplica viewMessages sem
+            // qualquer dependência das permissões do WhatsPanda.
+            const { data: internalConversationId, error: createError } = await supabase
+                .rpc('get_or_create_internal_conversation', {
+                    p_contact_id: contactId
+                });
 
             if (createError) throw createError;
-
-            // 3. Adicionar participantes
-            const { error: partInsertError } = await supabase.from('conversation_participants').insert([
-                { conversation_id: newConv.id, user_id: currentUser.id, company_id: currentUser.company_id },
-                { conversation_id: newConv.id, user_id: contactId, company_id: currentUser.company_id }
-            ]);
-
-            if (partInsertError) throw partInsertError;
+            if (!internalConversationId) {
+                throw new Error('Não foi possível criar ou localizar a conversa.');
+            }
 
             await fetchConversations();
-            setSelectedConversationId(newConv.id);
+            setSelectedConversationId(internalConversationId);
             setActiveTab('conversations');
 
         } catch (error: any) {

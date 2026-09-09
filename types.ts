@@ -248,6 +248,7 @@ export interface EmployeePermissions {
   // Agenda Permission
   viewScheduling: boolean;
   viewAgenda: boolean;
+  viewEvents: boolean;
   viewReservations: boolean;
 
   // Novas Permissões de RH
