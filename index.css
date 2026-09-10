@@ -4308,3 +4308,202 @@ html.dark {
 }
 
 /* FIM — NORMALIZAÇÃO SEGURA V2 */
+/* Etapa 20 - Agenda premium */
+.agenda-premium-page {
+  --agenda-surface: rgba(255, 255, 255, .92);
+  --agenda-surface-soft: rgba(248, 250, 252, .88);
+  --agenda-border: rgba(203, 213, 225, .72);
+  --agenda-text: #0f172a;
+  --agenda-muted: #64748b;
+  --agenda-shadow: 0 18px 50px rgba(15, 23, 42, .10);
+  color: var(--agenda-text);
+  padding: clamp(.25rem, 1vw, 1.25rem);
+}
+
+.dark .agenda-premium-page {
+  --agenda-surface: rgba(15, 29, 42, .94);
+  --agenda-surface-soft: rgba(20, 38, 52, .90);
+  --agenda-border: rgba(100, 116, 139, .28);
+  --agenda-text: #f8fafc;
+  --agenda-muted: #94a3b8;
+  --agenda-shadow: 0 22px 60px rgba(0, 0, 0, .30);
+}
+
+.agenda-premium-hero {
+  min-height: 4.75rem;
+  padding: .25rem .15rem;
+}
+
+.agenda-premium-heading { display: flex; align-items: center; gap: 1rem; }
+.agenda-premium-heading h1 { margin: 0; font-size: clamp(1.7rem, 2vw, 2.3rem); font-weight: 900; letter-spacing: -.045em; color: var(--agenda-text); }
+.agenda-premium-heading p { margin: .15rem 0 0; color: var(--agenda-muted); font-size: .92rem; font-weight: 500; }
+.agenda-premium-icon { display: grid; place-items: center; width: 3.25rem; height: 3.25rem; flex: none; border-radius: 1rem; color: #052e2b; background: linear-gradient(135deg, #10d49b, #44e1b6); box-shadow: 0 12px 28px rgba(16, 185, 129, .24); }
+.agenda-premium-quote { margin-left: auto; padding: 1rem 3.25rem; border-radius: 999px; color: #08785e; font-style: italic; font-weight: 700; text-align: center; line-height: 1.35; background: linear-gradient(110deg, rgba(236,253,245,.72), rgba(209,250,229,.92)); }
+.dark .agenda-premium-quote { color: #6ee7c2; background: linear-gradient(110deg, rgba(6,78,59,.28), rgba(16,185,129,.12)); }
+
+.agenda-premium-layout { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; gap: 1rem; align-items: start; }
+.agenda-calendar-card,
+.agenda-mini-card,
+.agenda-day-card { background: var(--agenda-surface) !important; border: 1px solid var(--agenda-border) !important; box-shadow: var(--agenda-shadow) !important; backdrop-filter: blur(18px); }
+.agenda-calendar-card { min-width: 0; }
+.agenda-calendar-toolbar { padding: 1rem !important; color: var(--agenda-text) !important; background: var(--agenda-surface) !important; border-color: var(--agenda-border) !important; }
+.agenda-calendar-toolbar > div:first-child > div { background: var(--agenda-surface-soft) !important; }
+.agenda-calendar-toolbar > div:first-child button { color: var(--agenda-muted); }
+.agenda-calendar-toolbar > div:first-child span { color: var(--agenda-text); }
+.agenda-calendar-toolbar > div:last-child { background: var(--agenda-surface-soft) !important; border: 1px solid var(--agenda-border); }
+.agenda-calendar-toolbar > div:last-child button { color: var(--agenda-muted); }
+.agenda-calendar-toolbar > div:last-child button.bg-white { color: white !important; background: linear-gradient(135deg, #059669, #0fb981) !important; box-shadow: 0 8px 20px rgba(5,150,105,.22); }
+
+.agenda-premium-sidebar { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.agenda-mini-card, .agenda-day-card { border-radius: 1.4rem; padding: 1.25rem; }
+.agenda-mini-title { display: grid; grid-template-columns: 2rem 1fr 2rem; align-items: center; gap: .5rem; margin-bottom: 1rem; text-transform: capitalize; }
+.agenda-mini-title strong { text-align: center; font-size: 1rem; }
+.agenda-mini-title button { display: grid; place-items: center; width: 2rem; height: 2rem; border: 1px solid var(--agenda-border); border-radius: .75rem; color: var(--agenda-muted); transition: .2s ease; }
+.agenda-mini-title button:hover { color: #059669; background: rgba(16,185,129,.10); }
+.agenda-mini-weekdays, .agenda-mini-grid { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; }
+.agenda-mini-weekdays { margin-bottom: .35rem; color: var(--agenda-muted); font-size: .68rem; font-weight: 800; }
+.agenda-mini-grid button { aspect-ratio: 1; border-radius: .65rem; color: var(--agenda-text); font-size: .76rem; font-weight: 650; transition: .18s ease; }
+.agenda-mini-grid button:hover { color: #059669; background: rgba(16,185,129,.10); }
+.agenda-mini-grid button.is-muted { color: #cbd5e1; }
+.dark .agenda-mini-grid button.is-muted { color: #475569; }
+.agenda-mini-grid button.is-active { color: white; background: linear-gradient(135deg, #059669, #10b981); box-shadow: 0 7px 16px rgba(5,150,105,.25); }
+
+.agenda-day-heading { display: flex; justify-content: space-between; align-items: start; padding-bottom: 1rem; }
+.agenda-day-heading h3 { margin: 0; font-size: 1.12rem; font-weight: 900; }
+.agenda-day-heading p { margin: .2rem 0 0; color: var(--agenda-muted); font-size: .75rem; text-transform: capitalize; }
+.agenda-day-heading > span { display: grid; place-items: center; min-width: 1.8rem; height: 1.8rem; padding: 0 .45rem; border-radius: 999px; color: #047857; background: #d1fae5; font-size: .75rem; font-weight: 900; }
+.agenda-day-events { display: flex; flex-direction: column; gap: .45rem; }
+.agenda-day-event { display: grid; grid-template-columns: 2.8rem 2rem minmax(0,1fr) 1rem; gap: .55rem; align-items: center; width: 100%; padding: .7rem .55rem; border-left: 3px solid #10b981; border-radius: .7rem; color: var(--agenda-text); background: var(--agenda-surface-soft); text-align: left; }
+.agenda-day-event > strong { font-size: .72rem; }
+.agenda-day-event-icon { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: .6rem; border-width: 1px; }
+.agenda-day-event b, .agenda-day-event small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agenda-day-event b { font-size: .75rem; }
+.agenda-day-event small { margin-top: .15rem; color: var(--agenda-muted); font-size: .62rem; }
+.agenda-day-empty { padding: 2rem .75rem; border: 1px dashed var(--agenda-border); border-radius: .9rem; color: var(--agenda-muted); font-size: .78rem; text-align: center; }
+.agenda-see-day { display: flex; justify-content: center; align-items: center; gap: .4rem; width: 100%; margin-top: 1rem; padding: .7rem; border: 1px solid var(--agenda-border); border-radius: .75rem; color: var(--agenda-text); font-size: .72rem; font-weight: 800; }
+.agenda-see-day:hover { color: #059669; border-color: rgba(16,185,129,.45); }
+.agenda-sidebar-phrase { padding: .5rem 1rem 0; color: #147b69; font-family: cursive; font-size: 1.2rem; font-style: italic; line-height: 1.25; text-align: right; transform: rotate(-3deg); opacity: .78; }
+
+.agenda-list-view { min-height: 32rem; padding: 1rem; background: var(--agenda-surface-soft); }
+.agenda-list-event { display: flex; align-items: center; gap: .9rem; width: 100%; margin-bottom: .55rem; padding: .75rem 1rem; border: 1px solid var(--agenda-border); border-radius: 1rem; color: var(--agenda-text); background: var(--agenda-surface); transition: .2s ease; }
+.agenda-list-event:hover { border-color: rgba(16,185,129,.45); transform: translateY(-1px); box-shadow: 0 8px 22px rgba(15,23,42,.07); }
+.agenda-list-date { width: 3rem; text-align: center; }
+.agenda-list-date strong { display: block; font-size: 1.25rem; line-height: 1; }
+.agenda-list-date span, .agenda-list-event > div:nth-child(3) span { color: var(--agenda-muted); font-size: .7rem; text-transform: capitalize; }
+.agenda-list-accent { width: .28rem; align-self: stretch; border-radius: 999px; border: 0; }
+.agenda-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 28rem; gap: .45rem; color: var(--agenda-muted); text-align: center; }
+.agenda-empty-state strong { color: var(--agenda-text); }
+
+@media (max-width: 1180px) {
+  .agenda-premium-layout { grid-template-columns: minmax(0, 1fr); }
+  .agenda-premium-sidebar { display: grid; grid-template-columns: minmax(16rem, .8fr) minmax(20rem, 1.2fr); }
+  .agenda-sidebar-phrase { display: none; }
+}
+
+@media (max-width: 760px) {
+  .agenda-premium-page { padding: 0; }
+  .agenda-premium-quote { display: none; }
+  .agenda-premium-sidebar { grid-template-columns: 1fr; }
+  .agenda-calendar-card { border-radius: 1.1rem !important; }
+  .agenda-calendar-toolbar { min-width: 44rem; }
+  .agenda-premium-heading p { font-size: .8rem; }
+}
+
+/* ETAPA 20 - RESPONSIVIDADE HOMOLOGADA V2 */
+@media (max-width: 1500px) {
+  .agenda-premium-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .agenda-premium-sidebar {
+    display: grid !important;
+    grid-template-columns: minmax(16rem, .8fr) minmax(20rem, 1.2fr) !important;
+  }
+
+  .agenda-sidebar-phrase {
+    display: none !important;
+  }
+
+  .agenda-premium-hero {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .agenda-premium-quote {
+    align-self: center;
+    margin-left: 0;
+  }
+
+  .agenda-premium-hero > div:last-child {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .agenda-premium-hero > div:last-child {
+    align-items: stretch !important;
+  }
+
+  .agenda-premium-hero > div:last-child > button {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .agenda-premium-hero > div:last-child > div:last-child {
+    width: 100% !important;
+    min-width: 0;
+  }
+
+  .agenda-premium-hero > div:last-child > div:last-child > div {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .35rem !important;
+    width: 100%;
+  }
+
+  .agenda-premium-hero > div:last-child > div:last-child > div > button {
+    min-width: 0;
+    padding-inline: .45rem !important;
+    white-space: normal;
+  }
+
+  .agenda-premium-hero > div:last-child > div:last-child > div > button:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .agenda-calendar-toolbar {
+    min-width: 0 !important;
+  }
+
+  .agenda-calendar-toolbar > div {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .agenda-calendar-toolbar > div:first-child {
+    flex-wrap: wrap;
+    gap: .5rem;
+  }
+
+  .agenda-calendar-toolbar > div:last-child {
+    display: grid !important;
+    grid-template-columns: repeat(5, minmax(4.2rem, 1fr));
+    overflow-x: auto;
+  }
+
+  .agenda-list-view {
+    min-height: 20rem;
+    padding: .55rem;
+  }
+
+  .agenda-list-event {
+    gap: .5rem;
+    padding: .7rem .65rem;
+  }
+
+  .agenda-premium-sidebar {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+/* FIM - ETAPA 20 - RESPONSIVIDADE HOMOLOGADA V2 */

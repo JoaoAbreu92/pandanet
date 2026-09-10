@@ -82,12 +82,17 @@ const ReservationsManager: React.FC = () => {
     const handleApprove = async (res: any) => {
         try {
             // 1. Update reservation status
-            const { error: updateErr } = await supabase
+            const { data: updatedReservation, error: updateErr } = await supabase
                 .from('reservations')
                 .update({ status: 'approved' })
-                .eq('id', res.id);
+                .eq('id', res.id)
+                .eq('company_id', currentUser.company_id)
+                .eq('status', 'pending')
+                .select('id')
+                .maybeSingle();
 
             if (updateErr) throw updateErr;
+            if (!updatedReservation) throw new Error('Esta reserva já foi processada ou não está mais pendente.');
 
             // 2. Calculate times and create calendar event
             const startObj = new Date(`${res.start_date}T${res.start_time}:00`);
@@ -124,10 +129,19 @@ const ReservationsManager: React.FC = () => {
                 .from('events')
                 .insert(eventPayload);
 
-            if (eventError) throw eventError;
+            if (eventError) {
+                const { error: restoreError } = await supabase
+                    .from('reservations')
+                    .update({ status: 'pending' })
+                    .eq('id', res.id)
+                    .eq('company_id', currentUser.company_id)
+                    .eq('status', 'approved');
+                if (restoreError) throw new Error(`Falha ao criar o evento e ao restaurar a reserva: ${eventError.message}`);
+                throw new Error(`A reserva permaneceu pendente porque o evento não pôde ser criado: ${eventError.message}`);
+            }
 
             // 3. Notify applicant
-            await supabase.from('notifications').insert({
+            const { error: notificationError } = await supabase.from('notifications').insert({
                 user_id: res.user_id,
                 type: 'system',
                 title: 'Reserva Aprovada 🟢',
@@ -136,7 +150,9 @@ const ReservationsManager: React.FC = () => {
                 link: '/reservations'
             });
 
-            alert('Reserva aprovada com sucesso!');
+            alert(notificationError
+                ? 'Reserva aprovada e adicionada à Agenda, mas a notificação interna não pôde ser entregue.'
+                : 'Reserva aprovada, adicionada à Agenda e notificada com sucesso!');
             fetchReservations();
         } catch (err: any) {
             alert('Erro ao aprovar reserva: ' + err.message);

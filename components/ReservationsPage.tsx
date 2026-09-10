@@ -257,7 +257,10 @@ const ReservationsPage: React.FC<ReservationsPageProps> = ({ initialTab }) => {
             fetchReservations();
         } catch (err: any) {
             console.error('Erro ao efetuar reserva:', err);
-            showToast('Erro ao efetuar reserva: ' + err.message, 'error');
+            const message = err?.code === '23P01' || String(err?.message || '').toLowerCase().includes('conflit')
+                ? 'Este recurso acabou de ser reservado nesse intervalo. Atualize os horários e tente novamente.'
+                : 'Erro ao efetuar reserva: ' + (err?.message || 'falha desconhecida');
+            showToast(message, 'error');
         } finally {
             setSubmitting(false);
         }

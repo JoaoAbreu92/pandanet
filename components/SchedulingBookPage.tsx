@@ -319,7 +319,18 @@ const SchedulingBookPage: React.FC<SchedulingBookPageProps> = ({ eventTypeId, is
 
             setStep('success');
         } catch (err: any) {
-            alert('Erro ao realizar reserva: ' + err.message);
+            const rawMessage = String(err?.message || 'Falha desconhecida');
+            if (err?.code === '23P01' || rawMessage.toLowerCase().includes('horário')) {
+                alert('Este horário acabou de ser reservado. Escolha outro horário disponível.');
+                setStep('datetime');
+                fetchEventDetails();
+            } else if (err?.code === '23514' || rawMessage.toLowerCase().includes('vagas')) {
+                alert('Não há mais vagas disponíveis para este agendamento.');
+                setStep('datetime');
+                fetchEventDetails();
+            } else {
+                alert('Erro ao realizar reserva: ' + rawMessage);
+            }
         } finally {
             setLoading(false);
         }

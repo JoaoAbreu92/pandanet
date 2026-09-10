@@ -179,16 +179,24 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
 
     const fetchEmailAccounts = async () => {
         try {
-            const { data, error } = await supabase
-                .from('email_settings')
-                .select('*')
-                .eq('company_id', currentUser.company_id)
-                .eq('user_id', currentUser.id);
-            if (!error && data) {
-                setEmailAccounts(data);
-            }
+            const session = await supabase.auth.getSession();
+            const token = session.data.session?.access_token;
+            if (!token) throw new Error('Sessão expirada. Entre novamente.');
+
+            const response = await fetch('/api/email/accounts/list', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ viewAllCompanyEmails: false })
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.error || 'Não foi possível carregar as contas de e-mail.');
+            setEmailAccounts(Array.isArray(result.accounts) ? result.accounts : []);
         } catch (err) {
             console.error('Erro ao buscar configurações de email:', err);
+            setEmailAccounts([]);
         }
     };
 
@@ -856,6 +864,8 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
         if (!showConfirmModal) return;
         setActionLoading(true);
         const booking = showConfirmModal;
+        let panelConfirmed = false;
+        let emailSent = false;
 
         try {
             // 1. Atualizar status da reserva no banco de dados
@@ -865,48 +875,45 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
                     status: 'confirmed',
                     payment_status: booking.price > 0 ? 'paid' : 'free' // marca como pago se confirmado
                 })
-                .eq('id', booking.id);
+                .eq('id', booking.id)
+                .eq('company_id', currentUser.company_id);
             if (dbError) throw dbError;
+            panelConfirmed = true;
 
             // 2. Enviar e-mail de confirmação usando a conta conectada se houver
             if (emailAccounts.length > 0) {
                 const activeAccount = emailAccounts[0]; // usa a primeira conta de email do anfitrião
-                const smtpConfig = {
-                    imap_host: activeAccount.imap_host,
-                    imap_port: activeAccount.imap_port,
-                    imap_user: activeAccount.imap_user,
-                    imap_pass: activeAccount.imap_pass,
-                    imap_ssl: activeAccount.imap_ssl,
-                    smtp_host: activeAccount.smtp_host,
-                    smtp_port: activeAccount.smtp_port,
-                    smtp_user: activeAccount.smtp_user,
-                    smtp_pass: activeAccount.smtp_pass,
-                    smtp_ssl: activeAccount.smtp_ssl,
-                };
-
-                const emailBodyHtml = customBody.replace(/\n/g, '<br/>');
+                const escapeHtml = (value: string) => value
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+                const emailBodyHtml = escapeHtml(customBody).replace(/\n/g, '<br/>');
 
                 // Envia pelo backend /api/email/send
                 const session = await supabase.auth.getSession();
                 const token = session.data.session?.access_token;
                 
-                await fetch('/api/email/send', {
+                const response = await fetch('/api/email/send', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify({
-                        config: smtpConfig,
+                        accountId: activeAccount.id,
                         payload: {
                             to: booking.guest_email,
                             subject: customSubject,
                             text: customBody,
                             html: `<div style="font-family: sans-serif; color: #334155; line-height: 1.6;">${emailBodyHtml}</div>`
-                        },
-                        user_id: currentUser.id
+                        }
                     })
                 });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(result.error || `Falha SMTP (${response.status}).`);
+                emailSent = true;
             } else {
                 console.warn('Nenhuma conta SMTP conectada ao anfitrião. Email não pôde ser enviado, apenas confirmado no painel.');
             }
@@ -915,7 +922,9 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
             addNotification({
                 type: 'system',
                 title: 'Reserva Confirmada',
-                description: `A reserva de ${booking.guest_name} foi confirmada e o e-mail enviado.`,
+                description: emailSent
+                    ? `A reserva de ${booking.guest_name} foi confirmada e o e-mail enviado.`
+                    : `A reserva de ${booking.guest_name} foi confirmada no painel, sem envio de e-mail.`,
                 link: `/scheduling`,
                 avatarUrl: '/logo.png'
             });
@@ -923,8 +932,9 @@ const SchedulingPage: React.FC<SchedulingPageProps> = ({ customFeatures, mode = 
             setShowConfirmModal(null);
             fetchBookings();
         } catch (err: any) {
-            alert('Reserva confirmada no painel, mas houve erro ao enviar e-mail: ' + err.message);
-            // Mesmo com erro de email, atualiza a lista
+            alert(panelConfirmed
+                ? 'Reserva confirmada no painel, mas o e-mail não foi enviado: ' + err.message
+                : 'Não foi possível confirmar a reserva: ' + err.message);
             setShowConfirmModal(null);
             fetchBookings();
         } finally {

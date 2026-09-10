@@ -107,7 +107,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
     const { t } = useLanguage();
 
     const [currentDate, setCurrentDate] = useState(new Date());
-    const [view, setView] = useState<'year' | 'month' | 'week' | 'day'>('month');
+    const [view, setView] = useState<'year' | 'month' | 'week' | 'day' | 'list'>('month');
 
     useEffect(() => {
         if (initialContext?.selectedDate) {
@@ -148,6 +148,10 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
     const [selectedCalendarUserId, setSelectedCalendarUserId] = useState<string>(currentUser?.id || '');
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
+    useEffect(() => {
+        if (!selectedCalendarUserId && currentUser?.id) setSelectedCalendarUserId(currentUser.id);
+    }, [currentUser?.id, selectedCalendarUserId]);
+
     const [newEventData, setNewEventData] = useState({
         title: '',
         date: new Date().toISOString().split('T')[0],
@@ -166,6 +170,11 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
     const [filterCategory, setFilterCategory] = useState('');
     const [filterDeptId, setFilterDeptId] = useState('');
     const [showFilters, setShowFilters] = useState(false);
+    const [formError, setFormError] = useState('');
+
+    useEffect(() => {
+        if (isCreateModalOpen) setFormError('');
+    }, [isCreateModalOpen, editingEventId]);
 
     const fetchShares = async () => {
         if (!currentUser?.id) return;
@@ -345,6 +354,36 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
         e.preventDefault();
         if (!currentUser?.company_id) return;
 
+        setFormError('');
+        if (!newEventData.title.trim()) {
+            setFormError('Informe o assunto do evento.');
+            return;
+        }
+
+        const startMinutes = Number(newEventData.startTime.slice(0, 2)) * 60 + Number(newEventData.startTime.slice(3, 5));
+        const endMinutes = Number(newEventData.endTime.slice(0, 2)) * 60 + Number(newEventData.endTime.slice(3, 5));
+        if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes) || endMinutes <= startMinutes) {
+            setFormError('O horário de término deve ser posterior ao horário de início.');
+            return;
+        }
+
+        const targetCalendarId = selectedCalendarUserId || currentUser.id;
+        const conflictingEvent = events.find(event => {
+            if (event.id === editingEventId || event.date !== newEventData.date) return false;
+            const belongsToTarget = event.creatorId === targetCalendarId
+                || event.attendees?.some(attendee => attendee.id === targetCalendarId)
+                || event.invitedIds?.includes(targetCalendarId);
+            if (!belongsToTarget) return false;
+            const existingStart = Number(event.startTime.slice(0, 2)) * 60 + Number(event.startTime.slice(3, 5));
+            const existingEnd = Number(event.endTime.slice(0, 2)) * 60 + Number(event.endTime.slice(3, 5));
+            return startMinutes < existingEnd && endMinutes > existingStart;
+        });
+
+        if (conflictingEvent) {
+            setFormError(`Conflito com “${conflictingEvent.title}”, das ${conflictingEvent.startTime} às ${conflictingEvent.endTime}.`);
+            return;
+        }
+
         let finalAttendees = [...newEventData.attendees];
         if (newEventData.departmentId) {
             const deptUsers = employees.filter(emp => (emp as any).department_id === newEventData.departmentId).map(emp => emp.id);
@@ -448,7 +487,10 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                 // Pequeno delay para garantir que as notificações foram enviadas antes do reload
                 setTimeout(() => window.location.reload(), 500);
             }
-        } catch (err) { console.error(err); }
+        } catch (err: any) {
+            console.error(err);
+            setFormError(err?.message || 'Não foi possível salvar o evento.');
+        }
     };
 
     const handleDeleteEvent = async (eventId: string) => {
@@ -692,7 +734,17 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
             return true;
         });
 
-        return [...filteredBySearch, ...birthdayEvents, ...holidayEvents, ...taskEvents];
+        const supplementaryEvents = [...birthdayEvents, ...holidayEvents, ...taskEvents].filter(event => {
+            if (filterText) {
+                const term = filterText.toLowerCase();
+                if (!event.title?.toLowerCase().includes(term) && !event.notes?.toLowerCase().includes(term)) return false;
+            }
+            if (filterCategory && !event.category?.toLowerCase().includes(filterCategory.toLowerCase())) return false;
+            if (filterUserId || filterDeptId) return false;
+            return true;
+        });
+
+        return [...filteredBySearch, ...supplementaryEvents];
     }, [events, employees, currentDate, personalTasks, selectedCalendarUserId, currentUser, filterText, filterUserId, filterCategory, filterDeptId]);
 
     const handleMonthClick = (monthIndex: number) => {
@@ -1347,13 +1399,70 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
         return 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-slate-700/30 dark:text-gray-300 dark:border-slate-800';
     };
 
+    const selectedDateKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+    const selectedDateEvents = allCalendarEvents
+        .filter(event => event.date === selectedDateKey)
+        .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+
+    const miniCalendarDays = useMemo(() => {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        const firstDay = new Date(year, month, 1).getDay();
+        const previousMonthDays = new Date(year, month, 0).getDate();
+        const currentMonthDays = new Date(year, month + 1, 0).getDate();
+        return Array.from({ length: 42 }, (_, index) => {
+            const dayOffset = index - firstDay + 1;
+            if (dayOffset < 1) return { day: previousMonthDays + dayOffset, offset: -1 };
+            if (dayOffset > currentMonthDays) return { day: dayOffset - currentMonthDays, offset: 1 };
+            return { day: dayOffset, offset: 0 };
+        });
+    }, [currentDate]);
+
+    const ListView = () => {
+        const monthEvents = allCalendarEvents
+            .filter(event => {
+                const date = new Date(`${event.date}T12:00:00`);
+                return date.getFullYear() === currentDate.getFullYear() && date.getMonth() === currentDate.getMonth();
+            })
+            .sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`));
+
+        return (
+            <div className="agenda-list-view">
+                {monthEvents.length === 0 ? (
+                    <div className="agenda-empty-state">
+                        <CalendarDaysIcon className="w-8 h-8" />
+                        <strong>Nenhum compromisso neste mês</strong>
+                        <span>Use “Novo evento” para começar a planejar.</span>
+                    </div>
+                ) : monthEvents.map(event => (
+                    <button key={`${event.id}-${event.date}`} onClick={() => { setSelectedEvent(event); setDetailModalOpen(true); }} className="agenda-list-event">
+                        <div className="agenda-list-date">
+                            <strong>{new Date(`${event.date}T12:00:00`).getDate()}</strong>
+                            <span>{new Date(`${event.date}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'short' })}</span>
+                        </div>
+                        <div className={`agenda-list-accent ${getCategoryColor(event.category)}`} />
+                        <div className="min-w-0 flex-1 text-left">
+                            <strong className="block truncate">{event.title}</strong>
+                            <span>{event.startTime}–{event.endTime}{event.location ? ` · ${event.location}` : ''}</span>
+                        </div>
+                        <ChevronRightIcon className="w-4 h-4" />
+                    </button>
+                ))}
+            </div>
+        );
+    };
+
     return (
-        <div className="max-w-screen-2xl mx-auto space-y-6">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between mb-2">
-                <div>
-                    <h1 className="text-3xl font-black text-slate-800 dark:text-gray-100 tracking-tight">{t('calendar.title')} <span className="text-brand-primary italic">Panda</span></h1>
-                    <p className="text-slate-500 dark:text-gray-400 font-medium">{t('calendar.subtitle')}</p>
+        <div className="agenda-premium-page max-w-screen-2xl mx-auto space-y-5">
+            <div className="agenda-premium-hero flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div className="agenda-premium-heading">
+                    <span className="agenda-premium-icon"><CalendarDaysIcon className="w-7 h-7" /></span>
+                    <div>
+                        <h1>{t('calendar.title')}</h1>
+                        <p>{t('calendar.subtitle')}</p>
+                    </div>
                 </div>
+                <div className="agenda-premium-quote">“Tempo bem planejado<br className="hidden sm:block" /> também é produtividade.”</div>
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     {sharedWithMe.length > 0 && (
                         <div className="flex items-center space-x-2">
@@ -1406,7 +1515,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                             });
                             setCreateModalOpen(true);
                         }} className="flex items-center justify-center space-x-2 px-6 py-3 text-sm font-black text-white bg-brand-primary rounded-2xl hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-all active:scale-95 w-full">
-                            <PlusIcon className="w-5 h-5" /><span>Agendar novo evento</span>
+                            <PlusIcon className="w-5 h-5" /><span>Novo evento</span>
                         </button>
                         <div className="flex gap-1 justify-end">
                             <button onClick={() => onNavigate?.('agenda', { tab: 'visits' })} className="px-2.5 py-1 text-[10px] font-bold text-yellow-800 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 rounded-lg transition-colors">
@@ -1463,8 +1572,9 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                 </div>
             )}
 
-            <Card title="" className="calendar-command-card p-0 overflow-x-auto overflow-y-hidden border-0 shadow-2xl shadow-slate-200 dark:shadow-none rounded-3xl">
-                <header className="bg-slate-900 text-white p-6 flex flex-col md:flex-row md:items-center justify-between border-b border-white/10 gap-4">
+            <div className="agenda-premium-layout">
+            <Card title="" className="calendar-command-card agenda-calendar-card p-0 overflow-x-auto overflow-y-hidden border-0 rounded-3xl">
+                <header className="agenda-calendar-toolbar flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center space-x-6">
                         <div className="flex items-center space-x-2 bg-white/10 p-1.5 rounded-2xl">
                             <button onClick={handlePrevYear} className="p-2 hover:bg-white/20 rounded-xl transition-all"><ChevronLeftIcon className="w-5 h-5" /></button>
@@ -1482,6 +1592,7 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                         <button onClick={() => setView('month')} className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${view === 'month' ? 'bg-white text-slate-900 shadow-lg' : 'text-white/60 hover:text-white'}`}>{t('calendar.month_view')}</button>
                         <button onClick={() => setView('week')} className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${view === 'week' ? 'bg-white text-slate-900 shadow-lg' : 'text-white/60 hover:text-white'}`}>Semana</button>
                         <button onClick={() => setView('day')} className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${view === 'day' ? 'bg-white text-slate-900 shadow-lg' : 'text-white/60 hover:text-white'}`}>Dia</button>
+                        <button onClick={() => setView('list')} className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${view === 'list' ? 'bg-white text-slate-900 shadow-lg' : 'text-white/60 hover:text-white'}`}>Lista</button>
                     </div>
                 </header>
 
@@ -1489,7 +1600,46 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                 {view === 'month' && <MonthView />}
                 {view === 'week' && <WeekView />}
                 {view === 'day' && <DayView />}
+                {view === 'list' && <ListView />}
             </Card>
+
+            <aside className="agenda-premium-sidebar">
+                <section className="agenda-mini-card">
+                    <div className="agenda-mini-title">
+                        <button onClick={handlePrevMonth}><ChevronLeftIcon className="w-4 h-4" /></button>
+                        <strong>{currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</strong>
+                        <button onClick={handleNextMonth}><ChevronRightIcon className="w-4 h-4" /></button>
+                    </div>
+                    <div className="agenda-mini-weekdays">{['D','S','T','Q','Q','S','S'].map((day, index) => <span key={`${day}-${index}`}>{day}</span>)}</div>
+                    <div className="agenda-mini-grid">
+                        {miniCalendarDays.map((entry, index) => {
+                            const cellDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + entry.offset, entry.day);
+                            const active = entry.offset === 0 && entry.day === currentDate.getDate();
+                            return <button key={index} className={`${entry.offset !== 0 ? 'is-muted' : ''} ${active ? 'is-active' : ''}`} onClick={() => { setCurrentDate(cellDate); setView('day'); }}>{entry.day}</button>;
+                        })}
+                    </div>
+                </section>
+
+                <section className="agenda-day-card">
+                    <div className="agenda-day-heading">
+                        <div><h3>Eventos do dia</h3><p>{currentDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</p></div>
+                        <span>{selectedDateEvents.length}</span>
+                    </div>
+                    <div className="agenda-day-events">
+                        {selectedDateEvents.length === 0 ? <div className="agenda-day-empty">Nenhum compromisso para este dia.</div> : selectedDateEvents.slice(0, 5).map(event => (
+                            <button key={`${event.id}-aside`} onClick={() => { setSelectedEvent(event); setDetailModalOpen(true); }} className="agenda-day-event">
+                                <strong>{event.startTime}</strong>
+                                <span className={`agenda-day-event-icon ${getCategoryColor(event.category)}`}><CalendarIcon className="w-4 h-4" /></span>
+                                <span className="min-w-0"><b>{event.title}</b><small>{event.location || event.category}</small></span>
+                                <span>⋮</span>
+                            </button>
+                        ))}
+                    </div>
+                    <button onClick={() => setView('day')} className="agenda-see-day">Ver todos os eventos do dia <ChevronRightIcon className="w-4 h-4" /></button>
+                </section>
+                <div className="agenda-sidebar-phrase">Disciplina hoje,<br /> resultados amanhã.</div>
+            </aside>
+            </div>
 
             {isCreateModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1500,6 +1650,11 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                             <p className="text-slate-500 dark:text-gray-400 font-medium">{editingEventId ? "Altere os dados do compromisso" : t('calendar.event_details')}</p>
                         </div>
                         <form onSubmit={handleCreateEvent} className="space-y-6">
+                            {formError && (
+                                <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
+                                    {formError}
+                                </div>
+                            )}
                             <div className="space-y-2">
                                 <label className="text-xs font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest ml-1">Assunto</label>
                                 <input type="text" name="title" value={newEventData.title} onChange={handleInputChange} required className="w-full bg-slate-50 dark:bg-slate-700 border-0 rounded-2xl p-4 text-slate-800 dark:text-gray-100 focus:ring-2 focus:ring-brand-primary transition-all font-semibold" placeholder="Ex: Planejamento Trimestral" />
@@ -1516,6 +1671,16 @@ const CalendarPage: React.FC<CalendarPageProps> = ({ events: initialEvents, curr
                                         <option>Outro</option>
                                     </select>
                                 </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest ml-1">Local ou link da reunião</label>
+                                <input type="text" name="location" value={newEventData.location} onChange={handleInputChange} maxLength={240} className="w-full bg-slate-50 dark:bg-slate-700 border-0 rounded-2xl p-4 text-slate-800 dark:text-gray-100 focus:ring-2 focus:ring-brand-primary transition-all font-semibold" placeholder="Ex: Sala Bamboo ou Google Meet" />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest ml-1">Observações</label>
+                                <textarea name="notes" value={newEventData.notes} onChange={handleInputChange} maxLength={2000} rows={3} className="w-full resize-y bg-slate-50 dark:bg-slate-700 border-0 rounded-2xl p-4 text-slate-800 dark:text-gray-100 focus:ring-2 focus:ring-brand-primary transition-all font-semibold" placeholder="Inclua informações importantes para os participantes." />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
