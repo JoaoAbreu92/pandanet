@@ -136,11 +136,11 @@ const ChatbotSettings: React.FC = () => {
                     };
                 });
 
-                // 3. Clear existing nodes in database
-                await supabase.from('whatsapp_chatbot_nodes').delete().eq('flow_id', selectedFlow.id);
-
-                // 4. Insert new nodes
-                const { error: insertErr } = await supabase.from('whatsapp_chatbot_nodes').insert(finalizedNodes);
+                // Substituição atômica: a função do banco apaga e insere na mesma transação.
+                const { error: insertErr } = await supabase.rpc('replace_whatsapp_chatbot_nodes', {
+                    p_flow_id: selectedFlow.id,
+                    p_nodes: finalizedNodes
+                });
                 if (insertErr) throw insertErr;
 
                 // 5. Update flow metadata if present in JSON
@@ -242,13 +242,14 @@ const ChatbotSettings: React.FC = () => {
         const { data: flowsData } = await supabase.from('whatsapp_chatbot_flows').select('*').eq('company_id', companyId);
         const { data: queuesData } = await supabase.from('whatsapp_queues').select('*').eq('company_id', companyId);
         const { data: teamData } = await supabase.from('profiles').select('id, full_name').eq('company_id', companyId);
-        const { data: settingsData } = await supabase.from('whatsapp_settings').select('gemini_api_key, chatbot_mode, chatbot_max_retries, chatbot_invalid_option_msg').eq('company_id', companyId).limit(1).single();
+        const { data: settingsData } = await supabase.from('whatsapp_settings').select('chatbot_mode, chatbot_max_retries, chatbot_invalid_option_msg').eq('company_id', companyId).limit(1).single();
 
         if (flowsData) setFlows(flowsData);
         if (queuesData) setQueues(queuesData);
         if (teamData) setTeam(teamData);
         if (settingsData) {
-            setGeminiKey(settingsData.gemini_api_key || '');
+            // A chave gravada nunca volta para o navegador.
+            setGeminiKey('');
             setChatbotMode((settingsData.chatbot_mode as any) || 'disabled');
             setChatbotMaxRetries(settingsData.chatbot_max_retries !== undefined ? settingsData.chatbot_max_retries : 2);
             setChatbotInvalidOptionMsg(settingsData.chatbot_invalid_option_msg || 'Opção inválida. Por favor, escolha uma das opções do menu:');
@@ -446,13 +447,14 @@ const ChatbotSettings: React.FC = () => {
         const companyId = currentUser?.company_id || profile?.company_id;
         if (!companyId) return;
         setLoading(true);
+        const settingsUpdate: Record<string, unknown> = {
+            chatbot_max_retries: chatbotMaxRetries,
+            chatbot_invalid_option_msg: chatbotInvalidOptionMsg
+        };
+        if (geminiKey.trim()) settingsUpdate.gemini_api_key = geminiKey.trim();
         const { error } = await supabase
             .from('whatsapp_settings')
-            .update({
-                gemini_api_key: geminiKey,
-                chatbot_max_retries: chatbotMaxRetries,
-                chatbot_invalid_option_msg: chatbotInvalidOptionMsg
-            })
+            .update(settingsUpdate)
             .eq('company_id', companyId);
         setLoading(false);
         if (error) {
@@ -1732,4 +1734,3 @@ const ChatbotSettings: React.FC = () => {
 };
 
 export default ChatbotSettings;
-

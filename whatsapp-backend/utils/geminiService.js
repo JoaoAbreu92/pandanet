@@ -59,6 +59,7 @@ async function analyzeMessageForTransfer(message, queues, agents, apiKey, busine
             };
         });
 
+        const safeMessage = String(message || '').slice(0, 4000);
         const prompt = `
         Aja como um atendente de triagem inteligente de WhatsApp para uma empresa.
         Sua tarefa é analisar a mensagem do cliente e identificar qual o setor (fila) ou atendente (agente) mais adequado para transferir a conversa.
@@ -89,11 +90,14 @@ async function analyzeMessageForTransfer(message, queues, agents, apiKey, busine
         6. Se o target_type for "queue" ou "agent":
            - Em "response", escreva uma breve mensagem simpática avisando que a conversa está sendo direcionada para aquele setor ou atendente específico (ex: "Com certeza! Vou transferir você para o setor de Comercial / Vendas agora. Um instante, por favor.").
 
-        Mensagem do Cliente: "${message}"
+        Mensagem do Cliente: "${safeMessage}"
 
         JSON Result:`;
 
-        const result = await model.generateContent(prompt);
+        const result = await Promise.race([
+            model.generateContent(prompt),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout do Gemini após 15 segundos')), 15000))
+        ]);
         const response = await result.response;
         let text = response.text().trim();
 
@@ -118,7 +122,5 @@ async function analyzeMessageForTransfer(message, queues, agents, apiKey, busine
         return { target_type: 'none', target_id: null, response: null };
     }
 }
-
-module.exports = { analyzeMessageForTransfer };
 
 module.exports = { analyzeMessageForTransfer };

@@ -27,6 +27,7 @@ const Channels: React.FC = () => {
     });
     const [historyEndDate, setHistoryEndDate] = useState(() => new Date().toISOString().slice(0, 10));
     const [syncingHistory, setSyncingHistory] = useState(false);
+    const [historySyncDays, setHistorySyncDays] = useState(30);
 
     // Form State
     const [currentId, setCurrentId] = useState<string | null>(null);
@@ -546,6 +547,23 @@ const Channels: React.FC = () => {
 
         setSyncingHistory(true);
         try {
+            const start = new Date(`${historyStartDate}T00:00:00`);
+            const end = new Date(`${historyEndDate}T00:00:00`);
+            const requestedDays = Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
+            if (!Number.isFinite(requestedDays) || requestedDays < 1) {
+                throw new Error('A data inicial deve ser anterior ou igual à data final.');
+            }
+            if (requestedDays > historySyncDays) {
+                throw new Error(`O período selecionado possui ${requestedDays} dias; o limite configurado é ${historySyncDays} dias.`);
+            }
+
+            const { error: limitError } = await supabase
+                .from('whatsapp_settings')
+                .update({ history_sync_days: historySyncDays })
+                .eq('id', historyModalChannel.id)
+                .eq('company_id', companyId);
+            if (limitError) throw limitError;
+
             const { data: sessionData } = await supabase.auth.getSession();
             const token = sessionData?.session?.access_token;
             
@@ -736,6 +754,13 @@ const Channels: React.FC = () => {
                                         </div>
                                     </div>
 
+                                    {!channel.is_connected && channel.last_sync_error && (
+                                        <div className="mb-4 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                                            <AlertTriangle className="h-4 w-4 shrink-0" />
+                                            <span>{channel.last_sync_error}</span>
+                                        </div>
+                                    )}
+
                                     {channel.channel_type === 'whatsapp' && (
                                         <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-6 bg-gray-100 dark:bg-white/5 py-2 px-4 rounded-xl inline-block tracking-widest">{channel.phone_number}</p>
                                     )}
@@ -771,7 +796,10 @@ const Channels: React.FC = () => {
                                                     <RefreshCw className="w-3 h-3" /> Sync
                                                 </button>
                                                 <button 
-                                                    onClick={() => setHistoryModalChannel(channel)} 
+                                                    onClick={() => {
+                                                        setHistorySyncDays(Math.min(60, Math.max(1, channel.history_sync_days || 30)));
+                                                        setHistoryModalChannel(channel);
+                                                    }} 
                                                     className="flex-1 py-2 text-[9px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 bg-purple-500/10 hover:bg-purple-500 hover:text-white rounded-lg transition-all duration-300 flex justify-center items-center gap-1"
                                                     title="Backup e Histórico de Atendimentos"
                                                 >
@@ -1253,7 +1281,21 @@ const Channels: React.FC = () => {
                             {/* Seletor de Datas */}
                             <div className="space-y-3">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Data Inicial (Até 60 dias)</label>
+                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Limite de histórico deste canal</label>
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={60}
+                                            value={historySyncDays}
+                                            onChange={e => setHistorySyncDays(Math.min(60, Math.max(1, Number(e.target.value) || 1)))}
+                                            className="w-28 p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm font-medium text-slate-800 dark:text-white outline-none focus:border-purple-500"
+                                        />
+                                        <span className="text-xs text-slate-500 dark:text-slate-400">dias (1 a 60), definido pelo administrador</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Data Inicial</label>
                                     <input 
                                         type="date" 
                                         value={historyStartDate}

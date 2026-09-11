@@ -841,6 +841,7 @@ export interface WhatsAppSettings {
   transfer_message_client?: string;
   transfer_message_agent?: string;
   send_transfer_message_to_client?: boolean;
+  history_sync_days?: number;
 }
 
 export interface WhatsAppQueue {

@@ -632,6 +632,41 @@ app.get('/', (req, res) => res.send('WhatsPanda Backend (Evolution Proxy) 🐼')
 // --- ROUTES ---
 const router = express.Router();
 
+async function getOwnedWhatsAppConnection(companyId, connectionId) {
+  if (!companyId || !connectionId) return null;
+  const { data, error } = await supabase
+    .from('whatsapp_settings')
+    .select('id, company_id, phone_number, connection_name, history_sync_days')
+    .eq('id', connectionId)
+    .eq('company_id', companyId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+function parseHistoryRange(startDate, endDate, configuredLimit = 30) {
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  if (!datePattern.test(String(startDate || '')) || !datePattern.test(String(endDate || ''))) {
+    return { error: 'Informe datas válidas no formato AAAA-MM-DD.' };
+  }
+
+  const start = new Date(`${startDate}T00:00:00.000Z`);
+  const end = new Date(`${endDate}T23:59:59.999Z`);
+  const today = new Date();
+  const todayEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 23, 59, 59, 999));
+  const limit = Math.min(60, Math.max(1, Number(configuredLimit) || 30));
+  const requestedDays = Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+    return { error: 'A data inicial deve ser anterior ou igual à data final.' };
+  }
+  if (end > todayEnd) return { error: 'A data final não pode estar no futuro.' };
+  if (requestedDays > limit) {
+    return { error: `O período solicitado possui ${requestedDays} dias; o limite deste canal é ${limit} dias.` };
+  }
+  return { startDate, endDate, requestedDays, limit };
+}
+
 // Resumo operacional global usado exclusivamente pelo Painel SaaS.
 // Mantém a service key no backend e nunca expõe tokens ou configurações sensíveis.
 router.get('/saas/overview', authMiddleware, async (req, res) => {
@@ -781,6 +816,9 @@ router.post('/sessions/:companyId/start/:connectionId', authMiddleware, async (r
   console.log(`[START] Requisitando Evolution para ${instanceName} (pairingNumber: ${pairingNumber || 'none'})...`);
 
   try {
+    const ownedConnection = await getOwnedWhatsAppConnection(companyId, connectionId);
+    if (!ownedConnection) return res.status(404).json({ error: 'Canal não encontrado nesta empresa.' });
+
     // 1. Tenta apagar a instância se já existir para forçar um recomeço limpo (com timeout de 15s)
     await fetchWithTimeout(`${evoUrl}/instance/logout/${instanceName}`, {
        method: 'DELETE',
@@ -803,7 +841,7 @@ router.post('/sessions/:companyId/start/:connectionId', authMiddleware, async (r
             qrcode: !isPairing,
             integration: "WHATSAPP-BAILEYS",
             webhook: webhookUrl,
-            events: ['QRCODE_UPDATED', 'CONNECTION_UPDATE', 'MESSAGES_UPSERT']
+            events: ['QRCODE_UPDATED', 'CONNECTION_UPDATE', 'MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'MESSAGES_DELETE', 'SEND_MESSAGE', 'CALL']
         })
     });
     
@@ -865,10 +903,13 @@ router.post('/sessions/:companyId/start/:connectionId', authMiddleware, async (r
 
 // API: Parar Sessão
 router.post('/sessions/:companyId/stop/:connectionId', authMiddleware, async (req, res) => {
-  const { connectionId } = req.params;
+  const { companyId, connectionId } = req.params;
   const instanceName = `conn_${connectionId}`;
 
   try {
+    const ownedConnection = await getOwnedWhatsAppConnection(companyId, connectionId);
+    if (!ownedConnection) return res.status(404).json({ error: 'Canal não encontrado nesta empresa.' });
+
     await fetchWithTimeout(`${evoUrl}/instance/logout/${instanceName}`, {
        method: 'DELETE',
        headers: { 'apikey': evoKey }
@@ -943,21 +984,18 @@ router.post('/sync-history/:companyId/:connectionId', authMiddleware, async (req
             return res.status(400).json({ error: 'Parâmetros companyId e connectionId são obrigatórios' });
         }
 
-        const { data: settings, error } = await supabase
-            .from('whatsapp_settings')
-            .select('id, company_id')
-            .eq('id', connectionId)
-            .eq('company_id', companyId)
-            .maybeSingle();
-        
-        if (error || !settings) {
+        const settings = await getOwnedWhatsAppConnection(companyId, connectionId);
+        if (!settings) {
             return res.status(403).json({ error: 'Você não tem permissão para sincronizar esta conexão ou ela não existe.' });
         }
+
+        const range = parseHistoryRange(startDate, endDate, settings.history_sync_days);
+        if (range.error) return res.status(400).json({ error: range.error });
 
         const instanceName = `conn_${connectionId}`;
         
         // Disparar sincronização de histórico em background
-        syncEvolutionData(instanceName, companyId, connectionId, startDate, endDate).catch(err => {
+        syncEvolutionData(instanceName, companyId, connectionId, range.startDate, range.endDate).catch(err => {
             console.error(`[SYNC-HISTORY-API] Erro em background para ${instanceName}:`, err.message);
         });
         
@@ -1109,20 +1147,17 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                 }
             }
 
-            // Para a Evolution API, enviar a URL pública hospedada localmente no Supabase (via Kong)
-            // Isso evita consumo de banda externa e resolve problemas de certificados SSL expirados.
-            let finalMediaUrl = mediaUrl;
-            if (mediaUrl.startsWith('data:') && savedMediaUrl) {
-                finalMediaUrl = savedMediaUrl;
-            }
+            // Entregar arquivos por URL para evitar estouro de pilha da Evolution API
+            // com documentos e mídias grandes codificados em Base64.
+            let finalMediaUrl = mediaUrl.startsWith('data:') && savedMediaUrl
+                ? savedMediaUrl
+                : mediaUrl;
 
-            // Se for URL do Supabase da empresa, converter para o IP da VPS para ser ultra-rápido e evitar SSL
-            if (finalMediaUrl && finalMediaUrl.includes('/storage/v1/object/public/')) {
-                finalMediaUrl = finalMediaUrl.replace('https://pandanet.grupopixel.com.br', 'http://77.37.43.60:8000');
-            }
+            // A Evolution 1.8.7 valida o endereço antes de baixá-lo e rejeita
+            // hostnames internos sem domínio. Manter a URL HTTPS assinada original.
 
             const audioSource = base64Data;
-            const mediaSource = base64Data;
+            const mediaSource = finalMediaUrl || base64Data;
 
             // Formato v1.8.7 da Evolution API (espera objeto audioMessage no topo)
             const body = isSticker ? {
@@ -1242,7 +1277,7 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                 }
             }
 
-            if (sendReq.ok && !sendRes?.error) sendOk = true;
+            if (sendReq.ok && !sendRes?.error && getEvolutionMessageId(sendRes)) sendOk = true;
 
         } else {
             // Envia no formato padrão suportado pela Evolution API da VPS (textMessage)
@@ -1253,7 +1288,7 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
             });
             try { sendRes = await sendReq.json(); } catch(e) { sendRes = {}; }
             console.log(`[SEND API] Resposta sendText (${sendReq.status}):`, JSON.stringify(sendRes));
-            if (sendReq.ok && !sendRes?.error) {
+            if (sendReq.ok && !sendRes?.error && getEvolutionMessageId(sendRes)) {
                 sendOk = true;
             }
         }
@@ -1282,7 +1317,8 @@ router.post('/messages/send/:conversationId', authMiddleware, async (req, res) =
                 media_type: mediaType || undefined,
                 is_from_customer: false,
                 sent_by: userId,
-                whatsapp_message_id: sendRes?.key?.id || undefined,
+                whatsapp_message_id: getEvolutionMessageId(sendRes) || undefined,
+                delivery_status: sendRes?.status || 'PENDING',
                 queue_id: conv.queue_id || null,
                 quoted_message_text: quoted_message_text || null,
                 quoted_message_sender: quoted_message_sender || null
@@ -1755,7 +1791,6 @@ router.post('/repair-webhooks/:companyId/:connectionId', authMiddleware, async (
                     'MESSAGES_UPSERT', 
                     'MESSAGES_UPDATE', 
                     'MESSAGES_DELETE',
-                    'MESSAGES_REVOKE',
                     'SEND_MESSAGE',
                     'CALL'
                 ]
@@ -1920,7 +1955,9 @@ async function syncEvolutionData(instanceName, companyId, connectionId, startDat
                         .from('whatsapp_conversations')
                         .select('id, company_id, connection_id, contact_phone, is_group, queue_id')
                         .eq('company_id', companyId)
+                        .eq('connection_id', connectionId)
                         .eq('contact_phone', phone)
+                        .eq('is_group', true)
                         .maybeSingle();
 
                     if (!convExists) {
@@ -1944,7 +1981,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId, startDat
                             console.log(`[SYNC] Grupo importado com sucesso: ${groupName} (${phone})`);
                             
                             // Se for sincronização de histórico por data, importar mensagens
-                            const createdConv = await supabase.from('whatsapp_conversations').select('id, company_id, connection_id, contact_phone, is_group, queue_id').eq('company_id', companyId).eq('contact_phone', phone).eq('is_group', true).maybeSingle();
+                            const createdConv = await supabase.from('whatsapp_conversations').select('id, company_id, connection_id, contact_phone, is_group, queue_id').eq('company_id', companyId).eq('connection_id', connectionId).eq('contact_phone', phone).eq('is_group', true).maybeSingle();
                             if (createdConv?.data && startDate && endDate) {
                                 console.log(`[SYNC] Importando mensagens do grupo recém-criado: ${groupName}`);
                                 await importHistoricalMessages(createdConv.data, instanceName, startDate, endDate);
@@ -1990,7 +2027,9 @@ async function syncEvolutionData(instanceName, companyId, connectionId, startDat
                         .from('whatsapp_conversations')
                         .select('id, company_id, connection_id, contact_phone, is_group, queue_id')
                         .eq('company_id', companyId)
+                        .eq('connection_id', connectionId)
                         .eq('contact_phone', phone)
+                        .eq('is_group', true)
                         .maybeSingle();
 
                     if (!convExists) {
@@ -2012,7 +2051,7 @@ async function syncEvolutionData(instanceName, companyId, connectionId, startDat
                             console.log(`[SYNC] Grupo importado via fetchAllGroups: ${groupName} (${phone})`);
                             
                             // Se for sincronização de histórico por data, importar mensagens
-                            const createdConv = await supabase.from('whatsapp_conversations').select('id, company_id, connection_id, contact_phone, is_group, queue_id').eq('company_id', companyId).eq('contact_phone', phone).eq('is_group', true).maybeSingle();
+                            const createdConv = await supabase.from('whatsapp_conversations').select('id, company_id, connection_id, contact_phone, is_group, queue_id').eq('company_id', companyId).eq('connection_id', connectionId).eq('contact_phone', phone).eq('is_group', true).maybeSingle();
                             if (createdConv?.data && startDate && endDate) {
                                 console.log(`[SYNC] Importando mensagens do grupo recém-criado via fetchAllGroups: ${groupName}`);
                                 await importHistoricalMessages(createdConv.data, instanceName, startDate, endDate);
@@ -2061,7 +2100,9 @@ async function syncEvolutionData(instanceName, companyId, connectionId, startDat
                         .from('whatsapp_conversations')
                         .select('id, company_id, connection_id, contact_phone, is_group, queue_id')
                         .eq('company_id', companyId)
+                        .eq('connection_id', connectionId)
                         .eq('contact_phone', phone)
+                        .or('is_group.eq.false,is_group.is.null')
                         .maybeSingle();
 
                     if (!convExists) {
@@ -2137,7 +2178,9 @@ async function syncEvolutionData(instanceName, companyId, connectionId, startDat
                         .from('whatsapp_conversations')
                         .select('id, company_id, connection_id, contact_phone, is_group, queue_id')
                         .eq('company_id', companyId)
+                        .eq('connection_id', connectionId)
                         .eq('contact_phone', phone)
+                        .or('is_group.eq.false,is_group.is.null')
                         .maybeSingle();
 
                     if (!convExists) {
@@ -2459,32 +2502,67 @@ function formatMenuText(node) {
     return text;
 }
 
-async function dispatchTextEvolution(instanceName, phoneNumber, text) {
+function getEvolutionMessageId(payload) {
+    return payload?.key?.id || payload?.message?.key?.id || payload?.data?.key?.id || null;
+}
+
+function normalizeEvolutionDeliveryStatus(value) {
+    const status = String(value || '').trim().toUpperCase();
+    const aliases = {
+        PENDING: 'PENDING', SERVER_ACK: 'SERVER_ACK', SENT: 'SERVER_ACK',
+        DELIVERY_ACK: 'DELIVERY_ACK', DELIVERED: 'DELIVERY_ACK',
+        READ: 'READ', PLAYED: 'PLAYED', ERROR: 'ERROR', FAILED: 'FAILED'
+    };
+    return aliases[status] || status;
+}
+
+function deliveryStatusRank(value) {
+    return {
+        '': 0, PENDING: 1, SERVER_ACK: 2, DELIVERY_ACK: 3,
+        READ: 4, PLAYED: 5, ERROR: 90, FAILED: 90
+    }[normalizeEvolutionDeliveryStatus(value)] ?? 0;
+}
+
+async function dispatchTextEvolutionDetailed(instanceName, phoneNumber, text) {
     const cleanNumber = (phoneNumber || "").replace(/\D/g, "");
-    let sendOk = false;
-    let sendRes = {};
+    if (cleanNumber.length < 10 || cleanNumber.length > 15) {
+        return { ok: false, error: 'Número de destino inválido', messageId: null };
+    }
+    let lastError = 'Falha desconhecida no envio';
+    for (let attempt = 1; attempt <= 3; attempt++) {
     try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
         const res = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
             method: 'POST',
             headers: { 'apikey': evoKey, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 number: cleanNumber,
                 textMessage: { text: text }
-            })
+            }),
+            signal: controller.signal
         });
+        clearTimeout(timeout);
+        let sendRes = {};
         try { sendRes = await res.json(); } catch(e) { sendRes = {}; }
-        console.log(`[EVO DISPATCH] Resposta sendText (${res.status}):`, JSON.stringify(sendRes));
-        if (res.ok && !sendRes?.error) {
-            sendOk = true;
+        const messageId = getEvolutionMessageId(sendRes);
+        console.log(`[EVO DISPATCH] Tentativa ${attempt}/3 sendText (${res.status}) ID=${messageId || 'ausente'}:`, JSON.stringify(sendRes));
+        if (res.ok && !sendRes?.error && messageId) {
+            return { ok: true, error: null, messageId, status: sendRes?.status || 'PENDING' };
         }
-
-        if (!sendOk) {
-            console.error(`[EVO DISPATCH] FALHA ao enviar para ${cleanNumber}. Resposta:`, JSON.stringify(sendRes));
-        }
+        lastError = sendRes?.response?.message || sendRes?.message || sendRes?.error || `HTTP ${res.status} sem confirmação de mensagem`;
     } catch (e) {
-        console.error('[EVO DISPATCH] Erro de rede/conexão:', e.message);
+        lastError = e.name === 'AbortError' ? 'Tempo limite esgotado ao enviar' : e.message;
+        console.error(`[EVO DISPATCH] Tentativa ${attempt}/3 falhou:`, lastError);
     }
-    return sendOk;
+    if (attempt < 3) await new Promise(resolve => setTimeout(resolve, attempt * 1500));
+    }
+    return { ok: false, error: String(lastError), messageId: null };
+}
+
+async function dispatchTextEvolution(instanceName, phoneNumber, text) {
+    const result = await dispatchTextEvolutionDetailed(instanceName, phoneNumber, text);
+    return result.ok;
 }
 
 async function sendBotMessage(text, conversation, companyId, connectionId) {
@@ -3563,11 +3641,32 @@ async function processInboundMessage(message, companyId, connectionId, isHistori
         // Verificar duplicata
         const { data: exists } = await supabase
             .from('whatsapp_messages')
-            .select('id')
+            .select('id, delivery_status')
+            .eq('company_id', companyId)
             .eq('whatsapp_message_id', msgId)
             .maybeSingle();
         
         if (exists) {
+            const eventStatus = normalizeEvolutionDeliveryStatus(
+                message?.status || message?.update?.status
+            );
+            if (isFromMe && eventStatus && deliveryStatusRank(eventStatus) > deliveryStatusRank(exists.delivery_status)) {
+                const { error: duplicateUpdateError } = await supabase
+                    .from('whatsapp_messages')
+                    .update({
+                        delivery_status: eventStatus,
+                        delivery_error: ['ERROR', 'FAILED'].includes(eventStatus)
+                            ? JSON.stringify(message?.error || message?.update?.error || 'Falha informada pela Evolution')
+                            : null
+                    })
+                    .eq('id', exists.id)
+                    .eq('company_id', companyId);
+                if (duplicateUpdateError) {
+                    addDebugLog('MSG_DUPLICATE_STATUS_ERR', `Erro ao atualizar status da mensagem ${msgId}: ${duplicateUpdateError.message}`);
+                } else {
+                    addDebugLog('MSG_DUPLICATE_STATUS_OK', `Mensagem ${msgId} atualizada para ${eventStatus}`);
+                }
+            }
             addDebugLog('MSG_DUPLICATE', `Mensagem duplicada, ignorando: ${msgId}`);
             return;
         }
@@ -4494,7 +4593,7 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
             const rawPhone = body?.sender || data?.user?.id || '';
             const cleanPhone = rawPhone.split('@')[0].replace(/\D/g, '');
             
-            const updateData = { is_connected: true, qr_code: null, pairing_code: null };
+            const updateData = { is_connected: true, qr_code: null, pairing_code: null, last_sync_error: null, connection_state_checked_at: new Date().toISOString(), disconnected_at: null };
             if (cleanPhone) {
                 updateData.phone_number = cleanPhone;
                 console.log(`[WEBHOOK-CONNECTION] Atualizando telefone da conexão ${connectionId} para ${cleanPhone}`);
@@ -4504,13 +4603,58 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
             // Disparar sincronização em background
             const instanceName = `conn_${connectionId}`;
             syncEvolutionData(instanceName, companyId, connectionId);
-        } else if (state === 'close' || state === 'disconnected' || state === 'refused') {
-            await supabase.from('whatsapp_settings').update({ is_connected: false }).eq('id', connectionId);
+        } else if (['close', 'closed', 'disconnected', 'refused', 'logout', 'loggedout'].includes(state)) {
+            await supabase.from('whatsapp_settings').update({
+                is_connected: false,
+                disconnected_at: new Date().toISOString(),
+                connection_state_checked_at: new Date().toISOString(),
+                last_sync_error: `Canal desconectado (${state}). Reconecte pelo menu Canais.`
+            }).eq('id', connectionId).eq('company_id', companyId);
+        }
+    }
+
+    if (event === 'messages.update' || event === 'messages_update') {
+        const updates = Array.isArray(data) ? data : (Array.isArray(data?.messages) ? data.messages : [data]);
+        for (const update of updates) {
+            const messageId = update?.key?.id || update?.id || update?.message?.key?.id;
+            const deliveryStatus = normalizeEvolutionDeliveryStatus(update?.status || update?.update?.status);
+            if (!messageId || !deliveryStatus) continue;
+            const { data: storedMessages, error: lookupError } = await supabase
+                .from('whatsapp_messages')
+                .select('id, delivery_status')
+                .eq('company_id', companyId)
+                .eq('whatsapp_message_id', messageId);
+            if (lookupError) {
+                addDebugLog('DELIVERY_LOOKUP_ERR', `Erro ao localizar ${messageId}: ${lookupError.message}`);
+                continue;
+            }
+            for (const stored of storedMessages || []) {
+                if (deliveryStatusRank(deliveryStatus) < deliveryStatusRank(stored.delivery_status)) continue;
+                const { error: statusError } = await supabase.from('whatsapp_messages').update({
+                    delivery_status: deliveryStatus,
+                    delivery_error: ['ERROR', 'FAILED'].includes(deliveryStatus)
+                        ? JSON.stringify(update?.error || update?.update?.error || 'Falha informada pela Evolution')
+                        : null
+                }).eq('id', stored.id).eq('company_id', companyId);
+                if (statusError) addDebugLog('DELIVERY_UPDATE_ERR', `Erro ao atualizar ${messageId}: ${statusError.message}`);
+            }
+            const targetStatus = ['ERROR', 'FAILED'].includes(deliveryStatus) ? 'failed' : undefined;
+            const { error: targetError } = await supabase
+                .from('whatsapp_scheduled_targets')
+                .update({
+                    delivery_status: deliveryStatus,
+                    delivery_confirmed_at: ['DELIVERY_ACK', 'READ', 'PLAYED'].includes(deliveryStatus)
+                        ? new Date().toISOString()
+                        : null,
+                    ...(targetStatus ? { status: targetStatus, error_message: 'Falha de entrega informada pela Evolution' } : {})
+                })
+                .eq('evolution_message_id', messageId);
+            if (targetError) addDebugLog('SCHEDULED_DELIVERY_UPDATE_ERR', `Erro ao atualizar alvo ${messageId}: ${targetError.message}`);
         }
     }
 
     // ----- MENSAGEM EXCLUÍDA / APAGADA (REVOKE) -----
-    const isRevokeEvent = ['messages.revoke', 'messages_revoke', 'message.revoke', 'message_revoke'].includes(event);
+    const isRevokeEvent = ['messages.delete', 'messages_delete', 'messages.revoke', 'messages_revoke', 'message.revoke', 'message_revoke'].includes(event);
     if (isRevokeEvent) {
         try {
             console.log(`[WEBHOOK] Evento de mensagem excluída (revoke) recebido.`);
@@ -4587,6 +4731,13 @@ app.post('/webhook/evolution/:companyId/:connectionId', async (req, res) => {
  */
 async function processScheduledCampaigns() {
     try {
+        const staleSendingBefore = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+        await supabase
+            .from('whatsapp_scheduled_targets')
+            .update({ status: 'pending', error_message: 'Envio anterior interrompido; recolocado na fila.' })
+            .eq('status', 'sending')
+            .lt('last_attempt_at', staleSendingBefore)
+            .lt('attempt_count', 3);
         // Função auxiliar para converter string de horário (HH:MM:SS ou HH:MM) em minutos desde a meia-noite
         const timeToMin = (tStr) => {
             if (!tStr) return 0;
@@ -4721,7 +4872,11 @@ async function processScheduledCampaigns() {
             // Marcar IMEDIATAMENTE como 'sending' no banco de dados para evitar duplicidade de concorrência
             const { error: markErr } = await supabase
                 .from('whatsapp_scheduled_targets')
-                .update({ status: 'sending' })
+                .update({
+                    status: 'sending',
+                    last_attempt_at: new Date().toISOString(),
+                    attempt_count: (target.attempt_count || 0) + 1
+                })
                 .eq('id', target.id);
 
             if (markErr) {
@@ -4802,15 +4957,20 @@ async function processScheduledCampaigns() {
                         })
                     });
                     
-                    if (res.ok) {
+                    let mediaResult = {};
+                    try { mediaResult = await res.json(); } catch (_) { mediaResult = {}; }
+                    const mediaMessageId = getEvolutionMessageId(mediaResult);
+                    if (res.ok && !mediaResult?.error && mediaMessageId) {
                         sendSuccess = true;
+                        target.evolution_message_id = mediaMessageId;
                     } else {
-                        const body = await res.text();
-                        errMsg = `Erro no envio de mídia: HTTP ${res.status} | ${body}`;
+                        errMsg = `Envio de mídia não confirmado: HTTP ${res.status} | ${JSON.stringify(mediaResult).substring(0, 500)}`;
                     }
                 } else {
-                    await dispatchTextEvolution(instanceName, target.contact_phone, messageText);
-                    sendSuccess = true;
+                    const dispatch = await dispatchTextEvolutionDetailed(instanceName, target.contact_phone, messageText);
+                    sendSuccess = dispatch.ok;
+                    target.evolution_message_id = dispatch.messageId;
+                    if (!dispatch.ok) errMsg = dispatch.error;
                 }
             } catch (sendErr) {
                 console.error(`[CAMPANHA] Falha no disparo:`, sendErr.message);
@@ -4822,9 +4982,12 @@ async function processScheduledCampaigns() {
                 .from('whatsapp_scheduled_targets')
                 .update({
                     status: sendSuccess ? 'sent' : 'failed',
+                    delivery_status: sendSuccess ? 'PENDING' : 'FAILED',
+                    delivery_confirmed_at: null,
                     selected_template_index: selectedIdx + 1,
                     sent_at: nowIso,
-                    error_message: errMsg
+                    error_message: errMsg,
+                    evolution_message_id: target.evolution_message_id || null
                 })
                 .eq('id', target.id);
 
@@ -4834,7 +4997,7 @@ async function processScheduledCampaigns() {
                 .eq('id', camp.id);
 
             // Inserir no histórico se conversa existir
-            try {
+            if (sendSuccess) try {
                 const { data: existingConv } = await supabase
                     .from('whatsapp_conversations')
                     .select('id')
@@ -4843,12 +5006,17 @@ async function processScheduledCampaigns() {
                     .maybeSingle();
 
                 if (existingConv) {
-                    await supabase.from('whatsapp_messages').insert({
+                    await supabase.from('whatsapp_messages').upsert({
                         company_id: camp.company_id,
                         conversation_id: existingConv.id,
                         message_text: camp.image_url ? `[Imagem Agendada] ${messageText}` : messageText,
                         is_from_customer: false,
-                        sent_by: null
+                        sent_by: null,
+                        whatsapp_message_id: target.evolution_message_id || null,
+                        delivery_status: 'PENDING'
+                    }, {
+                        onConflict: 'company_id,whatsapp_message_id',
+                        ignoreDuplicates: false
                     });
                 }
             } catch (histErr) {
@@ -4860,8 +5028,97 @@ async function processScheduledCampaigns() {
     }
 }
 
+const connectionFailureCounts = new Map();
+const requiredEvolutionEvents = ['QRCODE_UPDATED', 'CONNECTION_UPDATE', 'MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'MESSAGES_DELETE', 'SEND_MESSAGE', 'CALL'];
+
+async function ensureEvolutionWebhooks() {
+    try {
+        const { data: channels, error } = await supabase
+            .from('whatsapp_settings')
+            .select('id, company_id')
+            .eq('channel_type', 'whatsapp');
+        if (error) throw error;
+        for (const channel of channels || []) {
+            const instanceName = `conn_${channel.id}`;
+            const webhookUrl = `${backendWebhookBaseUrl}/webhook/evolution/${channel.company_id}/${channel.id}`;
+            const response = await fetchWithTimeout(`${evoUrl}/webhook/set/${instanceName}`, {
+                method: 'POST',
+                headers: { apikey: evoKey, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: true, url: webhookUrl, events: requiredEvolutionEvents })
+            });
+            if (!response.ok) {
+                const detail = await response.text();
+                throw new Error(`${instanceName}: HTTP ${response.status} ${detail.substring(0, 200)}`);
+            }
+            console.log(`[WEBHOOK-GUARD] ${instanceName} validado com ${requiredEvolutionEvents.length} eventos.`);
+        }
+    } catch (error) {
+        console.error('[WEBHOOK-GUARD] Falha:', error.message);
+    }
+}
+
+async function monitorWhatsAppConnections() {
+    try {
+        const { data: channels, error } = await supabase
+            .from('whatsapp_settings')
+            .select('id, company_id, is_connected')
+            .eq('channel_type', 'whatsapp');
+        if (error) throw error;
+
+        for (const channel of channels || []) {
+            try {
+                const response = await fetchWithTimeout(
+                    `${evoUrl}/instance/connectionState/conn_${channel.id}`,
+                    { headers: { apikey: evoKey } }
+                );
+                let payload = {};
+                try { payload = await response.json(); } catch (_) { payload = {}; }
+                const state = String(payload?.instance?.state || payload?.state || payload?.status || '').toLowerCase();
+                if (response.ok && ['open', 'connected'].includes(state)) {
+                    connectionFailureCounts.delete(channel.id);
+                    await supabase.from('whatsapp_settings').update({
+                        is_connected: true,
+                        last_sync_error: null,
+                        connection_state_checked_at: new Date().toISOString(),
+                        disconnected_at: null
+                    }).eq('id', channel.id).eq('company_id', channel.company_id);
+                    continue;
+                }
+
+                const failures = (connectionFailureCounts.get(channel.id) || 0) + 1;
+                connectionFailureCounts.set(channel.id, failures);
+                if (failures >= 2) {
+                    await supabase.from('whatsapp_settings').update({
+                        is_connected: false,
+                        disconnected_at: new Date().toISOString(),
+                        connection_state_checked_at: new Date().toISOString(),
+                        last_sync_error: `Canal desconectado ou indisponível (${state || `HTTP ${response.status}`}). Reconecte pelo menu Canais.`
+                    }).eq('id', channel.id).eq('company_id', channel.company_id);
+                }
+            } catch (channelError) {
+                const failures = (connectionFailureCounts.get(channel.id) || 0) + 1;
+                connectionFailureCounts.set(channel.id, failures);
+                if (failures >= 2 && channel.is_connected) {
+                    await supabase.from('whatsapp_settings').update({
+                        is_connected: false,
+                        disconnected_at: new Date().toISOString(),
+                        connection_state_checked_at: new Date().toISOString(),
+                        last_sync_error: 'Não foi possível confirmar a conexão com o WhatsApp. Verifique o canal.'
+                    }).eq('id', channel.id).eq('company_id', channel.company_id);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('[CONNECTION-WATCHDOG] Falha:', error.message);
+    }
+}
+
 // Iniciar o loop de disparos a cada 15 segundos
 setInterval(processScheduledCampaigns, 15000);
+setInterval(monitorWhatsAppConnections, 30000);
+setTimeout(monitorWhatsAppConnections, 5000);
+setInterval(ensureEvolutionWebhooks, 5 * 60 * 1000);
+setTimeout(ensureEvolutionWebhooks, 8000);
 
 
 // --- DIAGNOSTICO DE BANCO ---
