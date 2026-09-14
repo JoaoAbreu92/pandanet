@@ -10,10 +10,12 @@ const ResourceCenter: React.FC = () => {
     const [documents, setDocuments] = useState<ResourceDocument[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
+    const [errorMessage, setErrorMessage] = useState('');
 
     const fetchDocuments = async () => {
         if (!currentUser?.company_id) return;
         setLoading(true);
+        setErrorMessage('');
         try {
             const { data, error } = await supabase
                 .from('documents')
@@ -45,12 +47,14 @@ const ResourceCenter: React.FC = () => {
                         category: doc.category || 'Geral',
                         type: (doc.type || doc.file_type || 'PDF') as any,
                         url: doc.url,
+                        originalFileName: doc.original_file_name || `${doc.title}.${String(doc.type || 'pdf').toLowerCase()}`,
                         updatedAt: new Date(doc.updated_at || doc.created_at || Date.now()).toISOString().split('T')[0]
                     }));
                 setDocuments(formattedDocs);
             }
         } catch (error) {
             console.error('Error fetching documents:', error);
+            setErrorMessage('Não foi possível carregar a biblioteca. Tente novamente.');
         } finally {
             setLoading(false);
         }
@@ -75,7 +79,7 @@ const ResourceCenter: React.FC = () => {
         }
     };
 
-    if (loading) return <div className="p-8 text-center text-gray-500">Carregando documentos...</div>;
+    if (loading) return <div className="p-8 text-center text-gray-500 dark:text-slate-400">Carregando documentos...</div>;
 
     return (
         <Card title="Biblioteca Corporativa" headerAction={
@@ -86,14 +90,19 @@ const ResourceCenter: React.FC = () => {
                     placeholder="Buscar documentos..."
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
-                    className="pl-9 pr-3 py-2 w-full border rounded-md bg-gray-50 text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                    className="pl-9 pr-3 py-2 w-full border border-gray-200 dark:border-slate-700 rounded-md bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary"
                 />
             </div>
         }>
             <div className="overflow-x-auto">
-                {documents.length > 0 ? (
-                    <table className="w-full text-sm text-left text-gray-500">
-                        <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                {errorMessage ? (
+                    <div className="text-center py-10 text-red-600 dark:text-red-400">
+                        <p>{errorMessage}</p>
+                        <button onClick={fetchDocuments} className="mt-3 font-semibold text-brand-primary hover:underline">Tentar novamente</button>
+                    </div>
+                ) : filteredDocuments.length > 0 ? (
+                    <table className="w-full text-sm text-left text-gray-500 dark:text-slate-300">
+                        <thead className="text-xs text-gray-700 dark:text-slate-300 uppercase bg-gray-50 dark:bg-slate-800">
                             <tr>
                                 <th scope="col" className="px-6 py-3">Título do Documento</th>
                                 <th scope="col" className="px-6 py-3">Categoria</th>
@@ -104,14 +113,14 @@ const ResourceCenter: React.FC = () => {
                         </thead>
                         <tbody>
                             {filteredDocuments.map(doc => (
-                                <tr key={doc.id} className="bg-white border-b hover:bg-gray-50">
-                                    <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{doc.title}</td>
+                                <tr key={doc.id} className="bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800/80">
+                                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap">{doc.title}</td>
                                     <td className="px-6 py-4">{doc.category}</td>
                                     <td className="px-6 py-4"><span className={`px-2 py-0.5 rounded text-xs font-semibold ${getTypeStyle(doc.type)}`}>{doc.type}</span></td>
                                     <td className="px-6 py-4">{new Date(doc.updatedAt).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</td>
                                     <td className="px-6 py-4">
                                         <button 
-                                            onClick={() => downloadFile(doc.url, doc.title || 'documento')}
+                                            onClick={() => downloadFile(doc.url, doc.originalFileName || `${doc.title}.${doc.type.toLowerCase()}`)}
                                             className="font-medium text-brand-primary hover:underline bg-transparent border-none p-0 cursor-pointer"
                                         >
                                             Baixar
@@ -122,7 +131,9 @@ const ResourceCenter: React.FC = () => {
                         </tbody>
                     </table>
                 ) : (
-                    <div className="text-center py-8 text-gray-500">Nenhum documento encontrado.</div>
+                    <div className="text-center py-10 text-gray-500 dark:text-slate-400">
+                        {searchTerm ? 'Nenhum documento corresponde à busca.' : 'Nenhum documento disponível para você.'}
+                    </div>
                 )}
             </div>
         </Card>

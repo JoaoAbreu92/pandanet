@@ -521,6 +521,7 @@ export interface ResourceDocument {
   category: string;
   type: 'PDF' | 'DOCX' | 'PPTX' | 'XLSX' | 'OUTRO';
   url: string;
+  originalFileName?: string;
   updatedAt: string; // YYYY-MM-DD
 }
 

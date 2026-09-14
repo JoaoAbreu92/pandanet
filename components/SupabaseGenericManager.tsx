@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, PhotoIcon } from './icons';
-import { supabase, getCleanImageUrl } from '../supabaseClient';
+import { supabase, getCleanImageUrl, parseSupabaseStorageUrl } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import type { Employee } from '../types';
 
@@ -51,6 +51,16 @@ export function SupabaseGenericManager<T extends { id: string }>({
     const [files, setFiles] = useState<Record<string, File>>({});
     const [isProcessing, setIsProcessing] = useState(false);
 
+    const isCorporateLibrary = tableName === 'documents' && storageBucket === 'documents';
+
+    const removeStoredFile = async (url?: string | null) => {
+        if (!isCorporateLibrary || !url) return;
+        const parsed = parseSupabaseStorageUrl(url);
+        if (!parsed || parsed.bucket !== storageBucket) return;
+        const { error } = await supabase.storage.from(storageBucket).remove([parsed.path]);
+        if (error) throw error;
+    };
+
     const fetchItems = async () => {
         if (!activeCompanyId) return;
         setLoading(true);
@@ -70,6 +80,7 @@ export function SupabaseGenericManager<T extends { id: string }>({
                         const dbCol = f.dbColumn || f.key;
                         obj[f.key] = d[dbCol];
                     });
+                    if (isCorporateLibrary) obj.original_file_name = d.original_file_name;
                     return obj as T;
                 });
                 setItems(formatted);
@@ -124,6 +135,7 @@ export function SupabaseGenericManager<T extends { id: string }>({
         e.preventDefault();
         if (!activeCompanyId) return;
         setIsProcessing(true);
+        const uploadedPaths: string[] = [];
 
         try {
             const payload: any = { company_id: activeCompanyId };
@@ -142,18 +154,43 @@ export function SupabaseGenericManager<T extends { id: string }>({
 
                 if (field.type === 'file' && files[key]) {
                     const file = files[key];
-                    const fileName = `${tableName}_${Date.now()}_${file.name}`;
+                    if (isCorporateLibrary) {
+                        const allowedTypes = new Set([
+                            'application/pdf',
+                            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                        ]);
+                        if (!allowedTypes.has(file.type)) {
+                            throw new Error('Formato não permitido. Envie PDF, DOCX, PPTX ou XLSX.');
+                        }
+                        if (file.size > 20 * 1024 * 1024) {
+                            throw new Error('O arquivo excede o limite de 20 MB.');
+                        }
+                    }
+                    const extension = file.name.includes('.') ? file.name.split('.').pop() : 'bin';
+                    const fileName = isCorporateLibrary
+                        ? `${activeCompanyId}/${currentUser?.id}/${crypto.randomUUID()}.${extension}`
+                        : `${tableName}_${Date.now()}_${file.name}`;
                     const { error: uploadError } = await supabase.storage
                         .from(storageBucket)
                         .upload(fileName, file);
 
                     if (uploadError) throw uploadError;
+                    uploadedPaths.push(fileName);
 
                     const { data: { publicUrl } } = supabase.storage
                         .from(storageBucket)
                         .getPublicUrl(fileName);
 
                     payload[dbCol] = publicUrl;
+                    if (isCorporateLibrary) {
+                        const normalizedExtension = String(extension).toUpperCase();
+                        payload.type = ['PDF', 'DOCX', 'PPTX', 'XLSX'].includes(normalizedExtension)
+                            ? normalizedExtension
+                            : 'OUTRO';
+                        payload.original_file_name = file.name;
+                    }
                 } else {
                     const isArrayField = Array.isArray(newItemTemplate[key as keyof T]);
                     if (isArrayField) {
@@ -169,11 +206,22 @@ export function SupabaseGenericManager<T extends { id: string }>({
             }
 
             if (editingItem) {
+                const replacedFiles = fields
+                    .filter(field => field.type === 'file' && files[field.key])
+                    .map(field => (editingItem as any)[field.key])
+                    .filter(Boolean);
                 const { error } = await supabase
                     .from(tableName)
                     .update(payload)
                     .eq('id', editingItem.id);
                 if (error) throw error;
+                for (const oldUrl of replacedFiles) {
+                    try {
+                        await removeStoredFile(oldUrl);
+                    } catch (cleanupError) {
+                        console.warn('O registro foi atualizado, mas o arquivo anterior não pôde ser removido:', cleanupError);
+                    }
+                }
             } else {
                 const { error } = await supabase
                     .from(tableName)
@@ -184,6 +232,9 @@ export function SupabaseGenericManager<T extends { id: string }>({
             fetchItems();
             setIsModalOpen(false);
         } catch (err: any) {
+            if (uploadedPaths.length > 0) {
+                await supabase.storage.from(storageBucket).remove(uploadedPaths).catch(() => undefined);
+            }
             console.error(`Error saving ${tableName}:`, err);
             alert('Erro ao salvar item: ' + (err?.message || err?.details || JSON.stringify(err)));
         } finally {
@@ -194,11 +245,21 @@ export function SupabaseGenericManager<T extends { id: string }>({
     const handleDelete = async (id: string) => {
         if (confirm('Tem certeza que deseja excluir este item?')) {
             try {
+                const item = items.find(candidate => candidate.id === id);
                 const { error } = await supabase
                     .from(tableName)
                     .delete()
                     .eq('id', id);
                 if (error) throw error;
+                if (item) {
+                    for (const field of fields.filter(candidate => candidate.type === 'file')) {
+                        try {
+                            await removeStoredFile((item as any)[field.key]);
+                        } catch (cleanupError) {
+                            console.warn('O registro foi excluído, mas um arquivo legado não pôde ser removido:', cleanupError);
+                        }
+                    }
+                }
                 fetchItems();
             } catch (err: any) {
                 console.error(`Error deleting ${tableName}:`, err);
@@ -289,8 +350,10 @@ export function SupabaseGenericManager<T extends { id: string }>({
                                                     )}
                                                     <input
                                                         type="file"
+                                                        accept={isCorporateLibrary ? '.pdf,.docx,.pptx,.xlsx' : undefined}
                                                         className="w-full text-sm text-gray-550 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-brand-primary hover:file:bg-emerald-100 cursor-pointer"
                                                         onChange={(e) => handleFileChange(e, field.key)}
+                                                        required={!field.optional && !editingItem && !formData[field.key]}
                                                     />
                                                 </div>
                                                 {files[field.key] && <p className="text-xs text-emerald-600 mt-2 font-medium">Arquivo selecionado: {files[field.key].name}</p>}

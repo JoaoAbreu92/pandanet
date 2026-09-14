@@ -5,6 +5,14 @@ import type { MarketplaceItem, MarketplaceItemCondition } from '../types';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 
+const ALLOWED_MARKETPLACE_IMAGES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const MAX_MARKETPLACE_IMAGE_SIZE = 10 * 1024 * 1024;
+const marketplaceStoragePath = (url: string) => {
+    const marker = '/storage/v1/object/public/marketplace-media/';
+    const position = url.indexOf(marker);
+    return position >= 0 ? decodeURIComponent(url.slice(position + marker.length)) : null;
+};
+
 const ItemFormModal: React.FC<{
     item: MarketplaceItem | null;
     onClose: () => void;
@@ -25,6 +33,12 @@ const ItemFormModal: React.FC<{
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             const files = [...e.target.files];
+            const invalid = files.find(file => !ALLOWED_MARKETPLACE_IMAGES.has(file.type) || file.size > MAX_MARKETPLACE_IMAGE_SIZE);
+            if (invalid) {
+                alert(`${invalid.name} deve ser JPG, PNG ou WebP e ter no máximo 10 MB.`);
+                e.target.value = '';
+                return;
+            }
             setNewFiles(prev => [...prev, ...files]);
 
             // Preview locally
@@ -57,9 +71,8 @@ const ItemFormModal: React.FC<{
 
             // 1. Upload new files
             for (const file of newFiles) {
-                const fileExt = file.name.split('.').pop();
-                const fileName = `${Math.random()}.${fileExt}`;
-                const filePath = `${currentUser.id}/${fileName}`;
+                const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+                const filePath = `${currentUser.company_id}/${currentUser.id}/${crypto.randomUUID()}.${fileExt}`;
 
                 const { error: uploadError } = await supabase.storage
                     .from('marketplace-media')
@@ -111,11 +124,11 @@ const ItemFormModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 relative animate-fade-in-up">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl p-6 relative animate-fade-in-up">
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600" disabled={uploading}>
                     <XCircleIcon className="w-6 h-6" />
                 </button>
-                <h3 className="text-xl font-bold text-brand-text mb-4">{item?.id ? 'Editar Item' : 'Adicionar Novo Item'}</h3>
+                <h3 className="text-xl font-bold text-brand-text dark:text-gray-100 mb-4">{item?.id ? 'Editar Item' : 'Adicionar Novo Item'}</h3>
                 <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
                     <div>
                         <label className="block text-sm font-medium text-brand-subtle-text">Título</label>
@@ -221,14 +234,19 @@ const MarketplaceManager: React.FC = () => {
         setFormOpen(true);
     };
 
-    const handleDelete = async (itemId: string | number) => {
+    const handleDelete = async (item: MarketplaceItem) => {
         if (window.confirm('Tem certeza que deseja remover este item?')) {
             try {
                 const { error } = await supabase
                     .from('marketplace_items')
                     .delete()
-                    .eq('id', itemId);
+                    .eq('id', item.id);
                 if (error) throw error;
+                const paths = item.imageUrls.map(marketplaceStoragePath).filter((path): path is string => Boolean(path));
+                if (paths.length) {
+                    const { error: storageError } = await supabase.storage.from('marketplace-media').remove(paths);
+                    if (storageError) console.warn('Item removido, mas houve falha ao limpar uma mídia:', storageError);
+                }
                 fetchItems();
             } catch (err) {
                 console.error('Error deleting item:', err);
@@ -260,7 +278,7 @@ const MarketplaceManager: React.FC = () => {
                         </thead>
                         <tbody>
                             {items.map(item => (
-                                <tr key={item.id} className="bg-white border-b hover:bg-gray-50">
+                            <tr key={item.id} className="bg-white dark:bg-slate-800 border-b dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700">
                                     <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{item.title}</td>
                                     <td className="px-6 py-4">R$ {item.price.toFixed(2)}</td>
                                     <td className="px-6 py-4">
@@ -271,7 +289,7 @@ const MarketplaceManager: React.FC = () => {
                                     <td className="px-6 py-4 text-xs">{item.listedBy || '---'}</td>
                                     <td className="px-6 py-4 text-right space-x-2">
                                         <button onClick={() => handleEdit(item)} className="p-2 text-brand-subtle-text hover:text-brand-primary"><PencilIcon className="w-5 h-5" /></button>
-                                        <button onClick={() => handleDelete(item.id)} className="p-2 text-brand-subtle-text hover:text-red-500"><TrashIcon className="w-5 h-5" /></button>
+                                        <button onClick={() => handleDelete(item)} className="p-2 text-brand-subtle-text hover:text-red-500"><TrashIcon className="w-5 h-5" /></button>
                                     </td>
                                 </tr>
                             ))}

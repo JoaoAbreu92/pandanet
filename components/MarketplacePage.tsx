@@ -5,6 +5,25 @@ import type { MarketplaceItem } from '../types';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 
+const MARKETPLACE_MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MARKETPLACE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+const validateMarketplaceImages = (files: File[]) => {
+    const invalid = files.find(file => !MARKETPLACE_IMAGE_TYPES.has(file.type) || file.size > MARKETPLACE_MAX_FILE_SIZE);
+    if (invalid) throw new Error(`A imagem ${invalid.name} deve ser JPG, PNG ou WebP e ter no máximo 10 MB.`);
+};
+
+const marketplaceFilePath = (currentUser: any, file: File) => {
+    const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+    return `${currentUser.company_id}/${currentUser.id}/${crypto.randomUUID()}.${extension}`;
+};
+
+const marketplaceStoragePath = (url: string) => {
+    const marker = '/storage/v1/object/public/marketplace-media/';
+    const position = url.indexOf(marker);
+    return position >= 0 ? decodeURIComponent(url.slice(position + marker.length)) : null;
+};
+
 const SellItemModal: React.FC<{ onClose: () => void; onAddItem: () => void; currentUser: any }> = ({ onClose, onAddItem, currentUser }) => {
     const [title, setTitle] = useState('');
     const [price, setPrice] = useState('');
@@ -18,6 +37,13 @@ const SellItemModal: React.FC<{ onClose: () => void; onAddItem: () => void; curr
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             const filesArray = Array.from(e.target.files);
+            try {
+                validateMarketplaceImages(filesArray);
+            } catch (error) {
+                alert(error instanceof Error ? error.message : 'Imagem inválida.');
+                e.target.value = '';
+                return;
+            }
             const combined = [...images, ...filesArray].slice(0, 7);
             setImages(combined);
 
@@ -53,17 +79,17 @@ const SellItemModal: React.FC<{ onClose: () => void; onAddItem: () => void; curr
         setUploading(true);
         try {
             let imageUrls: string[] = [];
+            const uploadedPaths: string[] = [];
 
             for (const file of images) {
-                const fileExt = file.name.split('.').pop();
-                const fileName = `${Math.random()}.${fileExt}`;
-                const filePath = `${currentUser.id}/${fileName}`;
+                const filePath = marketplaceFilePath(currentUser, file);
 
                 const { error: uploadError } = await supabase.storage
                     .from('marketplace-media')
                     .upload(filePath, file);
 
                 if (uploadError) throw uploadError;
+                uploadedPaths.push(filePath);
 
                 const { data } = supabase.storage
                     .from('marketplace-media')
@@ -88,7 +114,10 @@ const SellItemModal: React.FC<{ onClose: () => void; onAddItem: () => void; curr
                     image_urls: imageUrls
                 }]);
 
-            if (error) throw error;
+            if (error) {
+                if (uploadedPaths.length) await supabase.storage.from('marketplace-media').remove(uploadedPaths);
+                throw error;
+            }
 
             onAddItem();
             onClose();
@@ -310,6 +339,13 @@ const EditItemModal: React.FC<{
     const handleNewImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             const filesArray = Array.from(e.target.files);
+            try {
+                validateMarketplaceImages(filesArray);
+            } catch (error) {
+                alert(error instanceof Error ? error.message : 'Imagem inválida.');
+                e.target.value = '';
+                return;
+            }
             const totalCount = existingImageUrls.length + newImages.length + filesArray.length;
             if (totalCount > 7) {
                 alert('O limite máximo de fotos é 7.');
@@ -357,9 +393,7 @@ const EditItemModal: React.FC<{
             let finalImageUrls = [...existingImageUrls];
 
             for (const file of newImages) {
-                const fileExt = file.name.split('.').pop();
-                const fileName = `${Math.random()}.${fileExt}`;
-                const filePath = `${currentUser.id}/${fileName}`;
+                const filePath = marketplaceFilePath(currentUser, file);
 
                 const { error: uploadError } = await supabase.storage
                     .from('marketplace-media')
@@ -389,6 +423,15 @@ const EditItemModal: React.FC<{
                 .eq('id', item.id);
 
             if (error) throw error;
+
+            const removedPaths = item.imageUrls
+                .filter(url => !existingImageUrls.includes(url))
+                .map(marketplaceStoragePath)
+                .filter((path): path is string => Boolean(path));
+            if (removedPaths.length) {
+                const { error: removeError } = await supabase.storage.from('marketplace-media').remove(removedPaths);
+                if (removeError) console.warn('Não foi possível remover uma mídia antiga do anúncio:', removeError);
+            }
 
             onUpdateItem();
             onClose();
@@ -561,6 +604,7 @@ const MarketplacePage: React.FC = () => {
         }
         setLoading(true);
         try {
+            await supabase.rpc('marketplace_release_expired_reservations');
             const { data, error } = await supabase
                 .from('marketplace_items')
                 .select(`
@@ -614,7 +658,7 @@ const MarketplacePage: React.FC = () => {
                         status: item.status,
                         reservedBy: item.reserver?.full_name,
                         reservedAt: item.reserved_at,
-                        seller: item.profiles?.full_name || 'Usuário Excluído',
+                        seller: item.seller?.full_name || 'Usuário Excluído',
                         listedBy: item.listed_by,
                         listedAt: new Date(item.created_at).toLocaleDateString('pt-BR')
                     });
@@ -652,14 +696,7 @@ const MarketplacePage: React.FC = () => {
         if (!currentUser) return;
         try {
             const nowIso = new Date().toISOString();
-            const { error } = await supabase
-                .from('marketplace_items')
-                .update({
-                    status: 'Reservado',
-                    reserved_by: currentUser.id,
-                    reserved_at: nowIso
-                })
-                .eq('id', itemId);
+            const { error } = await supabase.rpc('marketplace_reserve_item', { p_item_id: itemId });
 
             if (error) throw error;
 
@@ -679,14 +716,7 @@ const MarketplacePage: React.FC = () => {
 
     const handleCancelReserveItem = async (itemId: number | string) => {
         try {
-            const { error } = await supabase
-                .from('marketplace_items')
-                .update({
-                    status: 'Disponível',
-                    reserved_by: null,
-                    reserved_at: null
-                })
-                .eq('id', itemId);
+            const { error } = await supabase.rpc('marketplace_cancel_reservation', { p_item_id: itemId });
 
             if (error) throw error;
 
@@ -712,6 +742,11 @@ const MarketplacePage: React.FC = () => {
                 .delete()
                 .eq('id', item.id);
             if (error) throw error;
+            const paths = item.imageUrls.map(marketplaceStoragePath).filter((path): path is string => Boolean(path));
+            if (paths.length) {
+                const { error: storageError } = await supabase.storage.from('marketplace-media').remove(paths);
+                if (storageError) console.warn('Anúncio removido, mas houve falha ao limpar uma mídia:', storageError);
+            }
             alert('Anúncio excluído com sucesso!');
             fetchItems();
         } catch (err) {
