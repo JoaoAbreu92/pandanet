@@ -11,9 +11,10 @@ import type { Department } from '../types';
 
 interface DepartmentManagerProps {
     companyId: string;
+    onDepartmentsChange?: (departments: Department[]) => void;
 }
 
-export const DepartmentManager: React.FC<DepartmentManagerProps> = ({ companyId }) => {
+export const DepartmentManager: React.FC<DepartmentManagerProps> = ({ companyId, onDepartmentsChange }) => {
     const { showToast } = useToast();
     const [departments, setDepartments] = useState<Department[]>([]);
     const [loading, setLoading] = useState(true);
@@ -32,7 +33,10 @@ export const DepartmentManager: React.FC<DepartmentManagerProps> = ({ companyId 
             .eq('company_id', companyId)
             .order('name');
 
-        if (data) setDepartments(data);
+        if (data) {
+            setDepartments(data);
+            onDepartmentsChange?.(data);
+        }
         setLoading(false);
     };
 

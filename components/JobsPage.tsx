@@ -47,6 +47,7 @@ const JobsPage: React.FC = () => {
             const { error } = await supabase.from('job_applications').insert({
                 job_id: jobId,
                 employee_id: profile.id,
+                company_id: profile.company_id,
                 status: 'pending'
             });
             if (error) throw error;
@@ -67,6 +68,7 @@ const JobsPage: React.FC = () => {
                     if (admin.id !== profile.id) {
                         notificationsToInsert.push({
                             user_id: admin.id,
+                            company_id: profile.company_id,
                             type: 'system',
                             title: 'Nova Candidatura Interna',
                             description: `${profile.full_name} se candidatou para a vaga: ${selectedJob?.title || 'Vaga Interna'}`,
@@ -81,6 +83,7 @@ const JobsPage: React.FC = () => {
             // 2. Notify the employee themselves
             notificationsToInsert.push({
                 user_id: profile.id,
+                company_id: profile.company_id,
                 type: 'system',
                 title: 'Candidatura Enviada',
                 description: `Sua candidatura para a vaga ${selectedJob?.title || 'Vaga Interna'} foi enviada com sucesso!`,
@@ -90,7 +93,12 @@ const JobsPage: React.FC = () => {
             });
 
             if (notificationsToInsert.length > 0) {
-                await supabase.from('notifications').insert(notificationsToInsert);
+                const { error: notificationError } = await supabase
+                    .from('notifications')
+                    .insert(notificationsToInsert);
+                if (notificationError) {
+                    console.error('Candidatura criada, mas a notificação falhou:', notificationError);
+                }
             }
 
             showToast('Candidatura enviada com sucesso!', 'success');
@@ -232,4 +240,3 @@ const JobsPage: React.FC = () => {
 };
 
 export default JobsPage;
-

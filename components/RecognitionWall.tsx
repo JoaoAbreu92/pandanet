@@ -5,7 +5,6 @@ import type { Recognition, Employee } from '../types';
 import RecognitionModal from './RecognitionModal';
 import { supabase, getCleanImageUrl } from '../supabaseClient';
 import { useAuth } from './AuthContext';
-import { useNotifications } from './NotificationContext';
 
 const RecognitionCard: React.FC<{ recognition: Recognition }> = ({ recognition }) => {
     const valueColors: { [key: string]: string } = {
@@ -37,7 +36,6 @@ const RecognitionCard: React.FC<{ recognition: Recognition }> = ({ recognition }
 
 const RecognitionWall: React.FC = () => {
     const { currentUser } = useAuth();
-    const { addNotification } = useNotifications();
     const [recognitions, setRecognitions] = useState<Recognition[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [showModal, setShowModal] = useState(false);
@@ -154,16 +152,6 @@ const RecognitionWall: React.FC = () => {
 
             if (insertError) throw insertError;
 
-            // Enviar notificação para o usuário reconhecido
-            await addNotification({
-                user_id: data.toUserId,
-                company_id: currentUser.company_id,
-                type: 'mention',
-                title: 'Novo Reconhecimento!',
-                description: `${currentUser.name} reconheceu você: "${data.message}"`,
-                avatarUrl: currentUser.avatarUrl,
-                link: '/'
-            });
             // Subscription will handle refresh
         } catch (error: any) {
             console.error('Error adding recognition:', error);

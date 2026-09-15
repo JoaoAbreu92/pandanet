@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, UsersIcon } from './icons';
-import { supabase, getCleanImageUrl } from '../supabaseClient';
+import { supabase, getCleanImageUrl, parseSupabaseStorageUrl } from '../supabaseClient';
 import type { Employee } from '../types';
 
 import { useAuth } from './AuthContext';
@@ -177,41 +177,58 @@ const JobsAdminManager: React.FC<JobsAdminManagerProps> = ({ employees }) => {
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!currentUser?.company_id || !currentUser?.id) {
+            alert('Empresa ou usuário não identificado.');
+            return;
+        }
+        if (coverFile && coverFile.size > 10 * 1024 * 1024) {
+            alert('A imagem de capa deve ter no máximo 10 MB.');
+            return;
+        }
+        if (descImageFile && descImageFile.size > 10 * 1024 * 1024) {
+            alert('A imagem da descrição deve ter no máximo 10 MB.');
+            return;
+        }
         setIsProcessing(true);
+        const uploadedPaths: string[] = [];
 
         try {
             // Upload cover image
             let finalCoverUrl = existingCoverUrl;
             if (coverFile) {
-                const fileName = `job_cover_${Date.now()}_${coverFile.name}`;
+                const ext = coverFile.name.split('.').pop()?.toLowerCase() || 'jpg';
+                const fileName = `${currentUser.company_id}/${currentUser.id}/${crypto.randomUUID()}-cover.${ext}`;
                 const { error: uploadError } = await supabase.storage
-                    .from('feed-media')
+                    .from('jobs-media')
                     .upload(fileName, coverFile);
 
                 if (uploadError) throw uploadError;
 
                 const { data } = supabase.storage
-                    .from('feed-media')
+                    .from('jobs-media')
                     .getPublicUrl(fileName);
 
                 finalCoverUrl = data.publicUrl;
+                uploadedPaths.push(fileName);
             }
 
             // Upload description image
             let finalDescImageUrl = existingDescImageUrl;
             if (descImageFile) {
-                const fileName = `job_desc_${Date.now()}_${descImageFile.name}`;
+                const ext = descImageFile.name.split('.').pop()?.toLowerCase() || 'jpg';
+                const fileName = `${currentUser.company_id}/${currentUser.id}/${crypto.randomUUID()}-description.${ext}`;
                 const { error: uploadError } = await supabase.storage
-                    .from('feed-media')
+                    .from('jobs-media')
                     .upload(fileName, descImageFile);
 
                 if (uploadError) throw uploadError;
 
                 const { data } = supabase.storage
-                    .from('feed-media')
+                    .from('jobs-media')
                     .getPublicUrl(fileName);
 
                 finalDescImageUrl = data.publicUrl;
+                uploadedPaths.push(fileName);
             }
 
             const payload = {
@@ -234,6 +251,20 @@ const JobsAdminManager: React.FC<JobsAdminManagerProps> = ({ employees }) => {
                     .eq('id', editingJob.id);
 
                 if (error) throw error;
+
+                const replacedUrls = [
+                    coverFile ? existingCoverUrl : '',
+                    descImageFile ? existingDescImageUrl : ''
+                ];
+                for (const url of replacedUrls) {
+                    const parsed = url ? parseSupabaseStorageUrl(url) : null;
+                    if (parsed?.bucket === 'jobs-media') {
+                        const { error: cleanupError } = await supabase.storage
+                            .from(parsed.bucket)
+                            .remove([parsed.path]);
+                        if (cleanupError) console.error('Falha ao limpar mídia substituída:', cleanupError);
+                    }
+                }
             } else {
                 const { error } = await supabase
                     .from('jobs')
@@ -248,6 +279,9 @@ const JobsAdminManager: React.FC<JobsAdminManagerProps> = ({ employees }) => {
                 setSelectedJobForCandidates(null);
             }
         } catch (err: any) {
+            if (uploadedPaths.length > 0) {
+                await supabase.storage.from('jobs-media').remove(uploadedPaths);
+            }
             console.error('Error saving job:', err);
             alert('Erro ao salvar vaga: ' + (err?.message || JSON.stringify(err)));
         } finally {
@@ -258,12 +292,23 @@ const JobsAdminManager: React.FC<JobsAdminManagerProps> = ({ employees }) => {
     const handleDelete = async (id: string) => {
         if (window.confirm("Tem certeza que deseja apagar esta vaga?")) {
             try {
+                const job = jobs.find(item => item.id === id);
                 const { error } = await supabase
                     .from('jobs')
                     .delete()
                     .eq('id', id);
 
                 if (error) throw error;
+                const mediaPaths = [job?.cover_url, job?.description_image]
+                    .map(url => url ? parseSupabaseStorageUrl(url) : null)
+                    .filter((item): item is { bucket: string; path: string } => item?.bucket === 'jobs-media')
+                    .map(item => item.path);
+                if (mediaPaths.length > 0) {
+                    const { error: cleanupError } = await supabase.storage
+                        .from('jobs-media')
+                        .remove(mediaPaths);
+                    if (cleanupError) console.error('Vaga removida, mas a limpeza das mídias falhou:', cleanupError);
+                }
                 fetchJobs();
                 if (selectedJobForCandidates?.id === id) {
                     setSelectedJobForCandidates(null);

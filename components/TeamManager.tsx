@@ -172,50 +172,20 @@ const TeamManager: React.FC<TeamManagerProps> = ({ users, setUsers, onNavigate }
 
     const handleCreateTeam = async (name: string, memberIds: string[]) => {
         try {
-            const { error } = await supabase
-                .from('profiles')
-                .update({ team: name })
-                .in('id', memberIds);
-
+            if (!currentUser?.company_id) throw new Error('Empresa não identificada.');
+            const normalizedName = name.trim();
+            const { error } = await supabase.rpc('stage32_save_team', {
+                p_company_id: currentUser.company_id,
+                p_original_name: null,
+                p_new_name: normalizedName,
+                p_member_ids: memberIds
+            });
             if (error) throw error;
-
-            // Sync: create group chat conversation
-            if (currentUser) {
-                const compId = currentUser.company_id;
-                const { data: newConv, error: createError } = await supabase
-                    .from('conversations')
-                    .insert({
-                        company_id: compId,
-                        is_group: true,
-                        group_name: name,
-                        last_message: 'Grupo da equipe criado',
-                        last_message_at: new Date().toISOString(),
-                        created_by: currentUser.id
-                    })
-                    .select()
-                    .single();
-
-                if (createError) throw createError;
-
-                if (newConv && memberIds.length > 0) {
-                    const participants = memberIds.map(userId => ({
-                        conversation_id: newConv.id,
-                        user_id: userId,
-                        company_id: compId
-                    }));
-
-                    const { error: partError } = await supabase
-                        .from('conversation_participants')
-                        .insert(participants);
-
-                    if (partError) throw partError;
-                }
-            }
 
             // Update selected users to have the new team name
             const updatedUsers = users.map(u => {
                 if (memberIds.includes(u.id)) {
-                    return { ...u, team: name };
+                    return { ...u, team: normalizedName };
                 }
                 return u;
             });
@@ -236,100 +206,15 @@ const TeamManager: React.FC<TeamManagerProps> = ({ users, setUsers, onNavigate }
         if (!currentTeamName) return;
 
         try {
-            // 1. Remove users who were in this team but are NOT in the new list
-            const membersToRemove = users
-                .filter(u => u.team === currentTeamName && !memberIds.includes(u.id))
-                .map(u => u.id);
-
-            if (membersToRemove.length > 0) {
-                const { error: removeError } = await supabase
-                    .from('profiles')
-                    .update({ team: 'Sem Equipe' })
-                    .in('id', membersToRemove);
-                if (removeError) throw removeError;
-            }
-
-            // 2. Update users who ARE in the new list to this team
-            if (memberIds.length > 0) {
-                const { error: addError } = await supabase
-                    .from('profiles')
-                    .update({ team: newName })
-                    .in('id', memberIds);
-                if (addError) throw addError;
-            }
-
-            // 3. Sync: update group chat conversation name and participants
-            if (currentUser) {
-                const compId = currentUser.company_id;
-                
-                // Find existing team conversation
-                const { data: existingConv } = await supabase
-                    .from('conversations')
-                    .select('id')
-                    .eq('is_group', true)
-                    .eq('group_name', currentTeamName)
-                    .eq('company_id', compId)
-                    .maybeSingle();
-
-                if (existingConv) {
-                    // Update group name if renamed
-                    if (newName !== currentTeamName) {
-                        const { error: updateError } = await supabase
-                            .from('conversations')
-                            .update({ group_name: newName })
-                            .eq('id', existingConv.id);
-                        if (updateError) throw updateError;
-                    }
-
-                    // Delete old participants
-                    const { error: deletePartsError } = await supabase
-                        .from('conversation_participants')
-                        .delete()
-                        .eq('conversation_id', existingConv.id);
-                    if (deletePartsError) throw deletePartsError;
-
-                    // Insert new participants
-                    if (memberIds.length > 0) {
-                        const participants = memberIds.map(userId => ({
-                            conversation_id: existingConv.id,
-                            user_id: userId,
-                            company_id: compId
-                        }));
-                        const { error: partError } = await supabase
-                            .from('conversation_participants')
-                            .insert(participants);
-                        if (partError) throw partError;
-                    }
-                } else {
-                    // If not found, create new group
-                    const { data: newConv, error: createError } = await supabase
-                        .from('conversations')
-                        .insert({
-                            company_id: compId,
-                            is_group: true,
-                            group_name: newName,
-                            last_message: 'Grupo da equipe criado',
-                            last_message_at: new Date().toISOString(),
-                            created_by: currentUser.id
-                        })
-                        .select()
-                        .single();
-
-                    if (createError) throw createError;
-
-                    if (newConv && memberIds.length > 0) {
-                        const participants = memberIds.map(userId => ({
-                            conversation_id: newConv.id,
-                            user_id: userId,
-                            company_id: compId
-                        }));
-                        const { error: partError } = await supabase
-                            .from('conversation_participants')
-                            .insert(participants);
-                        if (partError) throw partError;
-                    }
-                }
-            }
+            if (!currentUser?.company_id) throw new Error('Empresa não identificada.');
+            const normalizedName = newName.trim();
+            const { error } = await supabase.rpc('stage32_save_team', {
+                p_company_id: currentUser.company_id,
+                p_original_name: currentTeamName,
+                p_new_name: normalizedName,
+                p_member_ids: memberIds
+            });
+            if (error) throw error;
 
             const updatedUsers = users.map(u => {
                 // Check if user is in the new member list
@@ -338,7 +223,7 @@ const TeamManager: React.FC<TeamManagerProps> = ({ users, setUsers, onNavigate }
                 const wasInTeam = u.team === currentTeamName;
 
                 if (isSelected) {
-                    return { ...u, team: newName };
+                    return { ...u, team: normalizedName };
                 } else if (wasInTeam) {
                     return { ...u, team: 'Sem Equipe' };
                 }
@@ -368,33 +253,12 @@ const TeamManager: React.FC<TeamManagerProps> = ({ users, setUsers, onNavigate }
         setIsDeleting(true);
 
         try {
-            const { error } = await supabase
-                .from('profiles')
-                .update({ team: 'Sem Equipe' })
-                .eq('team', teamName);
-
+            if (!currentUser?.company_id) throw new Error('Empresa não identificada.');
+            const { error } = await supabase.rpc('stage32_delete_team', {
+                p_company_id: currentUser.company_id,
+                p_team_name: teamName
+            });
             if (error) throw error;
-
-            // Mantém a sincronização existente com a conversa da equipe.
-            if (currentUser) {
-                const compId = currentUser.company_id;
-                const { data: existingConv } = await supabase
-                    .from('conversations')
-                    .select('id')
-                    .eq('is_group', true)
-                    .eq('group_name', teamName)
-                    .eq('company_id', compId)
-                    .maybeSingle();
-
-                if (existingConv) {
-                    const { error: deleteError } = await supabase
-                        .from('conversations')
-                        .delete()
-                        .eq('id', existingConv.id);
-
-                    if (deleteError) throw deleteError;
-                }
-            }
 
             const updatedUsers = users.map(user =>
                 user.team === teamName

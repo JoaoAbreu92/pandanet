@@ -1,6 +1,6 @@
 import ModalPortal from './ui/ModalPortal';
 import React, { useState, useEffect, useRef } from 'react';
-import { supabase, getCleanImageUrl, downloadFile, getSignedStorageUrl } from '../supabaseClient';
+import { supabase, getCleanImageUrl, downloadFile, getSignedStorageUrl, parseSupabaseStorageUrl } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import HRCalculatorAI from './HRCalculatorAI';
 
@@ -428,12 +428,15 @@ const HRManager: React.FC = () => {
 
   const uploadDocument = async () => {
     if (!docFile || !docForm.name) { showToast('Preencha o nome e selecione um arquivo.', false); return; }
+    if (docFile.size > 20 * 1024 * 1024) { showToast('O arquivo deve ter no máximo 20 MB.', false); return; }
     setUploadingDoc(true);
+    let uploadedPath: string | null = null;
     try {
       const ext = docFile.name.split('.').pop();
       const path = `documents/${profile!.company_id}/${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from('hr-files').upload(path, docFile);
       if (upErr) throw upErr;
+      uploadedPath = path;
       const publicUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/hr-files/${path}`;
       const { error } = await supabase.from('hr_documents').insert({
         company_id: profile!.company_id!,
@@ -447,6 +450,7 @@ const HRManager: React.FC = () => {
         target_departments: docTargetType === 'departments' ? docTargetDepts : [],
       });
       if (error) throw error;
+      uploadedPath = null;
       showToast('Documento publicado!');
       setDocForm({ name: '', description: '', category: 'general', is_public: true });
       setDocFile(null);
@@ -456,24 +460,37 @@ const HRManager: React.FC = () => {
       setUserSearch('');
       if (docInputRef.current) docInputRef.current.value = '';
       fetchDocuments();
-    } catch (e: any) { showToast(e.message || 'Erro ao publicar.', false); }
+    } catch (e: any) {
+      if (uploadedPath) await supabase.storage.from('hr-files').remove([uploadedPath]);
+      showToast(e.message || 'Erro ao publicar.', false);
+    }
     finally { setUploadingDoc(false); }
   };
 
   const deleteDocument = async (id: string) => {
     if (!confirm('Excluir este documento?')) return;
-    await supabase.from('hr_documents').delete().eq('id', id);
+    const document = docs.find(item => item.id === id);
+    const { error } = await supabase.from('hr_documents').delete().eq('id', id);
+    if (error) { showToast(error.message || 'Erro ao excluir documento.', false); return; }
+    const parsed = document?.file_url ? parseSupabaseStorageUrl(document.file_url) : null;
+    if (parsed?.bucket === 'hr-files') {
+      const { error: storageError } = await supabase.storage.from(parsed.bucket).remove([parsed.path]);
+      if (storageError) console.error('Documento removido, mas a limpeza do arquivo falhou:', storageError);
+    }
     showToast('Documento excluído.'); fetchDocuments();
   };
 
   const uploadPayslip = async () => {
     if (!psFile || !psEmployee || !psMonth) { showToast('Preencha todos os campos.', false); return; }
+    if (psFile.size > 20 * 1024 * 1024) { showToast('O arquivo deve ter no máximo 20 MB.', false); return; }
     setUploadingPs(true);
+    let uploadedPath: string | null = null;
     try {
       const ext = psFile.name.split('.').pop();
       const path = `payslips/${profile!.company_id}/${psEmployee}/${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from('hr-files').upload(path, psFile);
       if (upErr) throw upErr;
+      uploadedPath = path;
       const publicUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/hr-files/${path}`;
       const refDate = new Date();
       const { error } = await supabase.from('hr_payslips').insert({
@@ -482,17 +499,28 @@ const HRManager: React.FC = () => {
         file_name: psFile.name, net_salary: psNet ? parseFloat(psNet) : null, created_by: profile!.id
       });
       if (error) throw error;
+      uploadedPath = null;
       showToast('Holerite enviado!');
       setPsEmployee(''); setPsMonth(''); setPsNet(''); setPsFile(null);
       if (psInputRef.current) psInputRef.current.value = '';
       fetchPayslips();
-    } catch (e: any) { showToast(e.message || 'Erro ao enviar.', false); }
+    } catch (e: any) {
+      if (uploadedPath) await supabase.storage.from('hr-files').remove([uploadedPath]);
+      showToast(e.message || 'Erro ao enviar.', false);
+    }
     finally { setUploadingPs(false); }
   };
 
   const deletePayslip = async (id: string) => {
     if (!confirm('Excluir este holerite?')) return;
-    await supabase.from('hr_payslips').delete().eq('id', id);
+    const payslip = payslips.find(item => item.id === id);
+    const { error } = await supabase.from('hr_payslips').delete().eq('id', id);
+    if (error) { showToast(error.message || 'Erro ao excluir holerite.', false); return; }
+    const parsed = payslip?.file_url ? parseSupabaseStorageUrl(payslip.file_url) : null;
+    if (parsed?.bucket === 'hr-files') {
+      const { error: storageError } = await supabase.storage.from(parsed.bucket).remove([parsed.path]);
+      if (storageError) console.error('Holerite removido, mas a limpeza do arquivo falhou:', storageError);
+    }
     showToast('Holerite excluído.'); fetchPayslips();
   };
   const statusColors: Record<string, string> = {
@@ -509,10 +537,21 @@ const HRManager: React.FC = () => {
   if (loading) return <div className="flex justify-center p-12"><div className="animate-spin h-8 w-8 rounded-full border-4 border-brand-primary border-t-transparent" /></div>;
 
   return (
-    <div className="space-y-6">
+    <div className="stage32-hr-shell space-y-6">
+      <style>{`
+        .stage32-hr-shell > .stage32-ai-slot > button[title="Assistente de Cálculos de RH por IA"] {
+          position: static !important;
+        }
+      `}</style>
       {toast && (
         <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-2xl shadow-xl text-white font-medium ${toast.ok ? 'bg-emerald-500' : 'bg-red-500'}`}>
           {toast.msg}
+        </div>
+      )}
+
+      {profile && !viewingDocUrl && (
+        <div className="stage32-ai-slot flex justify-end">
+          <HRCalculatorAI currentUser={profile} />
         </div>
       )}
 
@@ -672,7 +711,7 @@ const HRManager: React.FC = () => {
               </div>
               <div className="md:col-span-2">
                 <label className="text-sm font-medium text-gray-600 dark:text-gray-300 block mb-1">Arquivo</label>
-                <input type="file" ref={docInputRef} onChange={e => setDocFile(e.target.files?.[0] || null)}
+                <input type="file" ref={docInputRef} accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg" onChange={e => setDocFile(e.target.files?.[0] || null)}
                   className="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-brand-primary file:text-white hover:file:bg-emerald-600" />
               </div>
 
@@ -884,7 +923,7 @@ const HRManager: React.FC = () => {
                     <p className="text-xs text-gray-400 dark:text-gray-500">{catLabels[doc.category] || doc.category} {doc.is_public ? '· Público' : '· Privado'}</p>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => { setViewingDocUrl(doc.file_url); setViewingDocName(doc.name); }}
+                    <button onClick={() => { setViewingDocUrl(doc.file_url); setViewingDocName(doc.file_name || doc.name); }}
                       className="px-3 py-1 bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 rounded-lg text-xs font-bold hover:bg-gray-200 dark:hover:bg-slate-700 transition-all">
                       Ver
                     </button>
@@ -950,7 +989,7 @@ const HRManager: React.FC = () => {
                   </div>
                   <div className="flex gap-2">
                     {ps.file_url && (
-                      <button onClick={() => { setViewingDocUrl(ps.file_url); setViewingDocName(`${ps.profiles?.full_name} — ${ps.month}`); }}
+                      <button onClick={() => { setViewingDocUrl(ps.file_url); setViewingDocName(ps.file_name || `${ps.profiles?.full_name} — ${ps.month}`); }}
                         className="px-3 py-1 bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 rounded-lg text-xs font-bold hover:bg-gray-200 dark:hover:bg-slate-700 transition-all">
                         Ver
                       </button>
@@ -1688,7 +1727,6 @@ const HRManager: React.FC = () => {
           </div>
         </ModalPortal>
       )}
-      {profile && <HRCalculatorAI currentUser={profile} />}
     </div>
   );
 };

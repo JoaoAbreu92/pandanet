@@ -14,7 +14,7 @@ interface SupabaseGenericManagerProps<T> {
     fields: {
         key: string;
         label: string;
-        type?: 'text' | 'select' | 'textarea' | 'file' | 'user_list' | 'department_list' | 'checkbox';
+        type?: 'text' | 'select' | 'textarea' | 'file' | 'user_select' | 'user_list' | 'department_list' | 'checkbox';
         options?: string[];
         list?: string[];
         dbColumn?: string; // If mapping is different
@@ -358,6 +358,18 @@ export function SupabaseGenericManager<T extends { id: string }>({
                                                 </div>
                                                 {files[field.key] && <p className="text-xs text-emerald-600 mt-2 font-medium">Arquivo selecionado: {files[field.key].name}</p>}
                                             </div>
+                                        ) : field.type === 'user_select' ? (
+                                            <select
+                                                className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-brand-primary outline-none transition-all bg-white"
+                                                value={formData[field.key] || ''}
+                                                onChange={e => setFormData({ ...formData, [field.key]: e.target.value })}
+                                                required={!field.optional}
+                                            >
+                                                <option value="">Selecione um colaborador...</option>
+                                                {users.map(user => (
+                                                    <option key={user.id} value={user.id}>{user.name}</option>
+                                                ))}
+                                            </select>
                                         ) : field.type === 'user_list' ? (
                                             <div className="mt-1 border rounded-lg p-3 max-h-40 overflow-y-auto bg-gray-50 space-y-2">
                                                 {users.map(u => (

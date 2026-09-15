@@ -323,7 +323,12 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
             case 'badges':
                 return <BadgesManager company={company} employees={employees} />;
             case 'departments':
-                return <DepartmentManager companyId={company.id!} />;
+                return (
+                    <DepartmentManager
+                        companyId={company.id!}
+                        onDepartmentsChange={setDepartments}
+                    />
+                );
             case 'teams':
                 return <TeamManager users={employees} setUsers={setEmployees} onNavigate={onNavigate} />;
             case 'org-flow':
@@ -447,13 +452,14 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     title="Mural de Reconhecimentos"
                     tableName="recognitions"
                     companyId={company.id}
-                    newItemTemplate={{ message: '', type: 'Trabalho em Equipe', value: 'Trabalho em Equipe', from_id: '', to_id: '' } as any}
+                    newItemTemplate={{ message: '', type: 'Trabalho em Equipe', value: 'Trabalho em Equipe', from_id: profile?.id || '', to_id: '' } as any}
                     fields={[
                         { key: 'message', label: 'Mensagem', type: 'textarea' },
-                        { key: 'to_id', label: 'Para (ID do Usuário)', type: 'user_list', dbColumn: 'to_id' },
-                        { key: 'from_id', label: 'De (ID do Usuário)', type: 'user_list', dbColumn: 'from_id' },
+                        { key: 'to_id', label: 'Para', type: 'user_select', dbColumn: 'to_id' },
+                        { key: 'from_id', label: 'De', type: 'user_select', dbColumn: 'from_id' },
                         { key: 'type', label: 'Valor', type: 'select', options: ['Trabalho em Equipe', 'Inovação', 'Foco no Cliente', 'Qualidade'] }
                     ]}
+                    users={employees}
                     renderItem={(i) => <div><p className="font-bold">{(i as any).message}</p><p className="text-sm">{(i as any).type}</p></div>}
                 />;
             case 'ti-requests':
