@@ -888,7 +888,16 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ userId, currentUser, onUpdate
                                                     onClick={() => setTempUserData(prev => ({ ...prev, avatarUrl: url }))}
                                                     className={`h-10 w-10 rounded-full overflow-hidden border-2 transition-all relative ${tempUserData.avatarUrl === url ? 'border-brand-primary scale-95 shadow-md' : 'border-transparent opacity-80 hover:opacity-100'}`}
                                                 >
-                                                    <img src={url} className="w-full h-full object-cover" alt={`Avatar ${i+1}`} />
+                                                    <img
+                                                        src={url}
+                                                        className="w-full h-full object-cover"
+                                                        alt={`Avatar ${i+1}`}
+                                                        onError={(event) => {
+                                                            const image = event.currentTarget;
+                                                            image.onerror = null;
+                                                            image.src = `https://ui-avatars.com/api/?name=Avatar+${i + 1}&background=E2E8F0&color=475569`;
+                                                        }}
+                                                    />
                                                     {tempUserData.avatarUrl === url && (
                                                         <div className="absolute inset-0 bg-brand-primary/20 flex items-center justify-center rounded-full">
                                                             <CheckIcon className="w-4 h-4 text-white filter drop-shadow-md" />

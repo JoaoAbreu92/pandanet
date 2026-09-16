@@ -120,21 +120,12 @@ const UsersTab: React.FC = () => {
         const employee = allEmployees.find(e => e.id === selectedEmployeeId);
         if (!employee) return;
 
-        // Update profile with new permissions
-        const updatedPermissions = {
-            ...(employee.permissions || {}),
-            viewWhatsPanda: true
-        };
-        const updates = {
-            whatspanda_permissions: permissions,
-            is_whatsapp_agent: true,
-            permissions: updatedPermissions
-        };
-
         const { error } = await supabase
-            .from('profiles')
-            .update(updates)
-            .eq('id', selectedEmployeeId);
+            .rpc('whatspanda_set_agent_access', {
+                p_target_user_id: selectedEmployeeId,
+                p_enabled: true,
+                p_permissions: permissions
+            });
 
         if (error) {
             alert('Erro ao salvar permissões: ' + error.message);
@@ -148,20 +139,12 @@ const UsersTab: React.FC = () => {
     const handleRemoveAgent = async (id: string) => {
         if (!confirm('Tem certeza que deseja remover este usuário do WhatsPanda? (Isso revogará todas as permissões)')) return;
 
-        const employee = allEmployees.find(e => e.id === id);
-        const updatedPermissions = {
-            ...(employee?.permissions || {}),
-            viewWhatsPanda: false
-        };
-
         const { error } = await supabase
-            .from('profiles')
-            .update({ 
-                whatspanda_permissions: null,
-                is_whatsapp_agent: false,
-                permissions: updatedPermissions
-            })
-            .eq('id', id);
+            .rpc('whatspanda_set_agent_access', {
+                p_target_user_id: id,
+                p_enabled: false,
+                p_permissions: {}
+            });
 
         if (error) {
             alert('Erro ao remover usuário: ' + error.message);

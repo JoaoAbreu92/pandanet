@@ -25,6 +25,8 @@ interface WhatsAppSettingsData {
     chatbot_delay?: number;
 }
 
+const DEFAULT_CLOSE_MESSAGE = 'Seu atendimento foi concluído. Obrigado pelo contato!';
+
 const DAYS_OF_WEEK = [
     { value: '1', label: 'Segunda-feira' },
     { value: '2', label: 'Terça-feira' },
@@ -47,7 +49,7 @@ const GeneralTab: React.FC = () => {
     const [businessHoursEnd, setBusinessHoursEnd] = useState('18:00');
     const [awayMessage, setAwayMessage] = useState('');
     const [enableAwayMessage, setEnableAwayMessage] = useState(true);
-    const [closeMessage, setCloseMessage] = useState('');
+    const [closeMessage, setCloseMessage] = useState(DEFAULT_CLOSE_MESSAGE);
     const [enableCloseMessage, setEnableCloseMessage] = useState(true);
     const [rejectCalls, setRejectCalls] = useState(false);
     const [rejectionMessage, setRejectionMessage] = useState('');
@@ -126,7 +128,7 @@ const GeneralTab: React.FC = () => {
         setBusinessHours(conn.business_hours || { general: {}, queues: {} });
         setAwayMessage(conn.away_message || '');
         setEnableAwayMessage(conn.enable_away_message !== false);
-        setCloseMessage(conn.close_message || '');
+        setCloseMessage(conn.close_message?.trim() || DEFAULT_CLOSE_MESSAGE);
         setEnableCloseMessage(conn.enable_close_message !== false);
         setRejectCalls(!!conn.reject_calls);
         setRejectionMessage(conn.rejection_message || '');
@@ -206,6 +208,12 @@ const GeneralTab: React.FC = () => {
     const handleSave = async () => {
         if (!selectedConnId) return;
 
+        const normalizedCloseMessage = closeMessage.trim();
+        if (enableCloseMessage && !normalizedCloseMessage) {
+            alert('Informe a mensagem de encerramento antes de ativar esta opção.');
+            return;
+        }
+
         setSaving(true);
         const updates = {
             business_hours_start: businessHoursStart ? `${businessHoursStart}:00` : null,
@@ -213,7 +221,7 @@ const GeneralTab: React.FC = () => {
             business_hours: businessHours,
             away_message: awayMessage,
             enable_away_message: enableAwayMessage,
-            close_message: closeMessage,
+            close_message: normalizedCloseMessage,
             enable_close_message: enableCloseMessage,
             reject_calls: rejectCalls,
             rejection_message: rejectionMessage,

@@ -102,16 +102,21 @@ export const OnlineUsersSidebar: React.FC<OnlineUsersSidebarProps> = ({
             if (!aOnline && bOnline) return 1;
             return (a.full_name || '').localeCompare(b.full_name || '');
         });
+    const onlineCount = sortedUsers.filter(user => onlineUsers.has(user.id)).length;
 
     return (
-        <div className={`relative h-full flex transition-all duration-300 ${isOpen ? 'w-64 lg:w-72' : 'w-12'} border-l border-gray-150 dark:border-white/5 bg-white/70 dark:bg-[#020617]/40 backdrop-blur-xl shrink-0`}>
+        <div className={`relative h-full flex transition-[width] duration-300 ${isOpen ? 'w-64 lg:w-72 border-l' : 'w-0'} border-gray-150 dark:border-white/5 bg-white/70 dark:bg-[#020617]/40 backdrop-blur-xl shrink-0`}>
             {/* Toggle Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="absolute top-1/2 -left-3.5 transform -translate-y-1/2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-white/10 rounded-full p-1 shadow-md hover:bg-slate-50 dark:hover:bg-slate-800 text-gray-500 hover:text-gray-700 dark:hover:text-white transition-all z-20 md:hidden"
+                className="absolute top-1/2 -left-8 transform -translate-y-1/2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-white/10 rounded-l-xl p-2 shadow-md hover:bg-slate-50 dark:hover:bg-slate-800 text-gray-500 hover:text-gray-700 dark:hover:text-white transition-all z-50"
+                aria-label={`${isOpen ? 'Recolher' : 'Abrir'} colaboradores. ${onlineCount} online`}
                 title={isOpen ? 'Recolher Barra' : 'Expandir Barra'}
             >
                 {isOpen ? <ChevronRightIcon className="w-4 h-4" /> : <ChevronLeftIcon className="w-4 h-4" />}
+                <span className="absolute -right-2 -top-2 flex min-w-5 h-5 items-center justify-center rounded-full border-2 border-white dark:border-slate-900 bg-emerald-500 px-1 text-[10px] font-black leading-none text-white shadow-md">
+                    {onlineCount}
+                </span>
             </button>
 
             {isOpen ? (
@@ -229,46 +234,7 @@ export const OnlineUsersSidebar: React.FC<OnlineUsersSidebarProps> = ({
                         })}
                     </div>
                 </div>
-            ) : (
-                <div className="flex-1 flex flex-col items-center pt-6 space-y-4 overflow-y-auto scrollbar-none">
-                    <span className="flex h-3.5 w-3.5 relative">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500"></span>
-                    </span>
-
-                    {/* Render minimal avatars for vertical stack */}
-                    <div className="space-y-3 pb-4">
-                        {sortedUsers.map(user => {
-                            const isOnline = onlineUsers.has(user.id);
-                            return (
-                                <div
-                                    key={user.id}
-                                    className="relative group cursor-pointer"
-                                    onClick={() => {
-                                        setIsOpen(true);
-                                        setSelectedUser(user);
-                                    }}
-                                >
-                                    <UserAvatar
-                                        src={user.avatar_url}
-                                        name={user.full_name}
-                                        level={user.level}
-                                        size="xs"
-                                    />
-                                    <span className={`absolute bottom-0 right-0 w-2 h-2 rounded-full border border-white dark:border-[#0f172a] ${
-                                        isOnline ? 'bg-emerald-500' : 'bg-gray-400'
-                                    }`} />
-
-                                    {/* Minimal Tooltip */}
-                                    <div className="absolute right-full mr-2 top-1/2 transform -translate-y-1/2 bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-30">
-                                        {user.full_name}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
+            ) : null}
         </div>
     );
 };

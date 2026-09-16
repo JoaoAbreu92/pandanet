@@ -212,32 +212,8 @@ const Layout: React.FC<LayoutProps> = ({
                     </main>
                 </div>
 
-                {/* Área invisível na extrema direita para acionar hover no desktop */}
                 {onStartDirectChat && (
-                    <div
-                        className="hidden xl:block fixed right-0 top-0 bottom-0 w-3 z-40 bg-transparent"
-                        onMouseEnter={() => {
-                            if (window.innerWidth >= 1280) {
-                                setRightSidebarOpen(true);
-                            }
-                        }}
-                    />
-                )}
-
-                {onStartDirectChat && (
-                    <div
-                        className="hidden xl:block h-full z-45"
-                        onMouseEnter={() => {
-                            if (window.innerWidth >= 1280) {
-                                setRightSidebarOpen(true);
-                            }
-                        }}
-                        onMouseLeave={() => {
-                            if (window.innerWidth >= 1280) {
-                                setRightSidebarOpen(false);
-                            }
-                        }}
-                    >
+                    <div className="hidden xl:block h-full z-45">
                         <OnlineUsersSidebar
                             currentUser={currentUser}
                             onStartChat={onStartDirectChat}

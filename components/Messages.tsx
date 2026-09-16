@@ -874,34 +874,22 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
     const fetchConversations = async () => {
         if (!currentUser) return;
         try {
-            const isGhost = isGhostMode; // Usar a flag real do contexto
             let conversationIds: string[] = [];
 
-            if (isGhost) {
-                // In Ghost Mode, fetch ALL conversations for the company
-                const { data: allConvs, error: allError } = await supabase
-                    .from('conversations')
-                    .select('id')
-                    .eq('company_id', currentUser.company_id);
+            // Conversas internas são privadas até mesmo durante auditorias. O
+            // usuário somente recebe conversas das quais participa de forma
+            // explícita. Chamados de suporte continuam disponíveis porque o
+            // Master Admin é incluído como participante pelo fluxo de suporte.
+            const { data: myParticipations, error: partError } = await supabase
+                .from('conversation_participants')
+                .select('conversation_id')
+                .eq('user_id', currentUser.id);
 
-                if (allError) {
-                    console.error("Erro busca todas as conversas (Ghost):", allError);
-                    return;
-                }
-                conversationIds = (allConvs || []).map((c: any) => c.id);
-            } else {
-                // 1. Obter todos os IDs de conversa do usuário atual
-                const { data: myParticipations, error: partError } = await supabase
-                    .from('conversation_participants')
-                    .select('conversation_id')
-                    .eq('user_id', currentUser.id);
-
-                if (partError) {
-                    console.error("Erro busca participações:", partError);
-                    return;
-                }
-                conversationIds = myParticipations.map((p: any) => p.conversation_id);
+            if (partError) {
+                console.error("Erro busca participações:", partError);
+                return;
             }
+            conversationIds = (myParticipations || []).map((p: any) => p.conversation_id);
 
             if (conversationIds.length === 0) {
                 setConversations([]);
@@ -941,13 +929,9 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
 
                     // Se for ghost e não participo, mostro os nomes envolvidos
                     let displayName = '';
-                    if (isGhost && !participants?.some(p => p.user_id === currentUser.id)) {
-                        displayName = participants?.map(p => (p.profiles as any)?.full_name).filter(Boolean).join(' & ') || 'Conversa sem Nome';
-                    } else {
-                        displayName = conv.is_group
-                            ? conv.group_name
-                            : (otherUser?.full_name || 'Usuário Desconhecido');
-                    }
+                    displayName = conv.is_group
+                        ? conv.group_name
+                        : (otherUser?.full_name || 'Usuário Desconhecido');
 
                     const displayAvatar = conv.is_group
                         ? `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName || 'Grupo')}&background=random`

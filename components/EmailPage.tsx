@@ -2257,8 +2257,8 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                 }`}>
                     {/* Toolbar for List */}
                     <div className="p-4 border-b border-gray-100 dark:border-white/5 flex flex-col gap-3 bg-white/50 dark:bg-[#020617]/60 backdrop-blur-xl z-20 sticky top-0">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
+                        <div className="flex min-w-0 items-center justify-between gap-2">
+                            <div className="flex min-w-0 flex-1 items-center gap-2">
                                 {!sidebarOpen && (
                                     <button
                                         onClick={() => setSidebarOpen(true)}
@@ -2279,16 +2279,17 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                 ) : (
                                     <button
                                         onClick={() => setIsSelectionMode(true)}
-                                            className="p-1 px-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg text-gray-400 hover:text-brand-primary transition-all flex items-center gap-1.5"
+                                            className="shrink-0 p-1.5 hover:bg-gray-100 dark:hover:bg-white/5 rounded-lg text-gray-400 hover:text-brand-primary transition-all flex items-center"
+                                        aria-label="Selecionar e-mails"
                                         title="Selecionar e-mails"
                                     >
                                         <TagIcon className="w-4 h-4" />
-                                            <span className="text-[10px] font-black uppercase tracking-widest">Selecionar</span>
+                                            <span className="sr-only">Selecionar</span>
                                     </button>
                                 )}
-                                <h2 className="font-bold text-gray-900 dark:text-white truncate tracking-tight">{getFolderName(currentFolder)}</h2>
+                                <h2 className="min-w-0 flex-1 font-bold text-gray-900 dark:text-white truncate tracking-tight">{getFolderName(currentFolder)}</h2>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex shrink-0 items-center gap-1">
                                 {isSelectionMode && selectedEmailUids.length > 0 && (
                                     <button
                                         onClick={deleteSelectedEmails}
@@ -2310,11 +2311,12 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                                         <button
                                             onClick={markAllAsRead}
                                             disabled={loading}
-                                            className="shrink-0 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/30 text-[9px] font-black text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wide whitespace-nowrap transition-all"
+                                            className="shrink-0 inline-flex items-center justify-center p-2 rounded-lg border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                            aria-label="Marcar todas como lidas"
                                             title="Marcar todas as mensagens desta página como lidas"
                                         >
                                             <EnvelopeOpenIcon className="w-3.5 h-3.5" />
-                                            Marcar todas como lidas
+                                            <span className="sr-only">Marcar todas como lidas</span>
                                         </button>
                                 )}
                             </div>

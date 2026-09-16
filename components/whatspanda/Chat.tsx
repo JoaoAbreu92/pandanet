@@ -1252,6 +1252,46 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
         updateData.closed_by = null;
       }
 
+      // Envia e confirma a mensagem antes de encerrar. A configuração é lida
+      // novamente para evitar estado antigo quando outro administrador a alterou.
+      if (newStatus === 'fechado' && !targetConv?.is_group) {
+        const { data: closeSettings, error: closeSettingsError } = await supabase
+          .from('whatsapp_settings')
+          .select('enable_close_message, close_message')
+          .eq('id', targetConv?.connection_id)
+          .maybeSingle();
+
+        if (closeSettingsError) throw closeSettingsError;
+
+        const closeMsg = closeSettings?.enable_close_message === true
+          ? closeSettings?.close_message?.trim()
+          : '';
+
+        if (closeSettings?.enable_close_message === true && !closeMsg) {
+          throw new Error('A mensagem de encerramento está habilitada, mas não foi configurada para este canal.');
+        }
+
+        if (closeMsg) {
+          const { data: sessionData } = await supabase.auth.getSession();
+          const token = sessionData?.session?.access_token;
+          if (!token) throw new Error('Sessão expirada. Entre novamente para encerrar o atendimento.');
+
+          const closeResponse = await fetch(`/api/whatsapp/messages/send/${conversationId}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ message: closeMsg, keepClosed: true })
+          });
+
+          if (!closeResponse.ok) {
+            const closeError = await closeResponse.json().catch(() => ({}));
+            throw new Error(closeError?.error || `Falha ao enviar mensagem de encerramento (HTTP ${closeResponse.status}).`);
+          }
+        }
+      }
+
       // 1. Atualizar o status da conversa no Supabase primeiro
       const { error } = await supabase
         .from('whatsapp_conversations')
@@ -1276,30 +1316,6 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
             })
           }).catch(err => {
             console.error('Erro ao enviar mensagem de protocolo:', err);
-          });
-        }
-      }
-
-      // 2. Enviar mensagem de encerramento se configurado no canal
-      const conn = targetConv ? (connections.find(c => c.id === targetConv.connection_id) || settings) : null;
-      const closeMsg = conn?.enable_close_message !== false ? conn?.close_message : null;
-
-      if (newStatus === 'fechado' && closeMsg && closeMsg.trim() && !targetConv?.is_group) {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData?.session?.access_token;
-        if (token) {
-          fetch(`/api/whatsapp/messages/send/${conversationId}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              message: closeMsg.trim(),
-              keepClosed: true
-            })
-          }).catch(err => {
-            console.error('Erro ao enviar mensagem de encerramento automática:', err);
           });
         }
       }
@@ -2845,7 +2861,7 @@ const Chat: React.FC<ChatProps> = ({ onConversationSelect, initialSearch = '', t
                     </div>
                   </div>
                   <div className="flex gap-1 sm:gap-2 items-center flex-shrink-0">
-                    {!selectedConversation.assigned_user && selectedConversation.status === 'aberto' && (!isGhostMode || ghostSuperAdmin) && (
+                    {!selectedConversation.assigned_to && selectedConversation.status === 'aberto' && (!isGhostMode || ghostSuperAdmin) && (
                       <button
                         onClick={() => handleUpdateStatus(selectedConversation.id, 'aberto', true)}
                         className="px-2 sm:px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-lg shadow-lg shadow-emerald-500/20 transition-all whitespace-nowrap"
