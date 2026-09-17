@@ -403,7 +403,13 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
     const { currentUser, profile, isGhostMode, realProfile } = useAuth();
     const { showToast } = useToast();
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(initialConversationId || null);
-    const { addNotification, playNotificationSound, showDesktopNotification, markNotificationsByLink } = useNotifications();
+    const {
+        addNotification,
+        playNotificationSound,
+        showDesktopNotification,
+        markNotificationsByLink,
+        setModuleUnreadCount
+    } = useNotifications();
 
     useEffect(() => {
         if (selectedConversationId) {
@@ -455,6 +461,7 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
     const [messages, setMessages] = useState<Message[]>([]);
     const [newMessageText, setNewMessageText] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [contactSearch, setContactSearch] = useState('');
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [showStickerPicker, setShowStickerPicker] = useState(false);
     const [stickerTab, setStickerTab] = useState<'gallery' | 'saved'>('gallery');
@@ -1115,6 +1122,19 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                 if (readError) {
                     console.error("Erro ao marcar mensagens como lidas:", readError);
                 } else {
+                    const { count: remainingUnread, error: countError } = await supabase
+                        .from('messages')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('receiver_id', currentUser.id)
+                        .eq('is_read', false);
+
+                    if (countError) {
+                        console.error("Erro ao atualizar contador de mensagens:", countError);
+                    } else {
+                        setModuleUnreadCount('messages', remainingUnread || 0);
+                    }
+
+                    markNotificationsByLink('/messages');
                     fetchConversations();
                 }
             }
@@ -1730,6 +1750,15 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                     </div>
                 </div>
 
+                {activeTab === 'contacts' && (
+                    <div className="border-b border-gray-100 p-3 dark:border-white/5">
+                        <label className="relative block">
+                            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                            <input type="search" value={contactSearch} onChange={event => setContactSearch(event.target.value)} placeholder="Buscar colaborador..." className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm text-gray-700 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/10 dark:bg-slate-900 dark:text-white" />
+                        </label>
+                    </div>
+                )}
+
                 {/* Suporte VIP para qualquer usuário - Restrito a Admins de Empresa externa (não da mesma empresa do Master Admin) */}
                 {currentUser.id !== masterAdminId && currentUser.email !== 'ti@grupopixel.com.br' && currentUser.isAdmin && masterAdminId && currentUser.company_id !== masterAdminCompanyId && (
                     <div className="px-4 py-3 bg-gradient-to-r from-red-50 to-orange-50 border-b border-red-100 relative overflow-hidden group">
@@ -1888,7 +1917,13 @@ const Messages: React.FC<MessagesProps> = ({ initialConversationId, onMinimizeCo
                         </ul>
                     )}
                     {activeTab === 'contacts' && (
-                        <ul> {companyEmployees.filter(e => e.id !== currentUser.id).map(emp => (
+                        <ul> {companyEmployees.filter(emp => {
+                            if (emp.id === currentUser.id) return false;
+                            const term = contactSearch.trim().toLocaleLowerCase('pt-BR');
+                            if (!term) return true;
+                            return [emp.name, emp.email, emp.role, emp.team]
+                                .some(value => String(value || '').toLocaleLowerCase('pt-BR').includes(term));
+                        }).map(emp => (
                             <li key={emp.id} onClick={() => handleStartConversation(emp.id)} className="p-4 flex items-center space-x-4 cursor-pointer hover:bg-gray-50">
                                 <div className="relative">
                                     <img

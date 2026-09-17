@@ -27,6 +27,11 @@ interface HeaderProps {
 import { useLanguage } from './LanguageContext';
 
 const Header: React.FC<HeaderProps> = ({ currentPage, onToggleSidebar, onToggleDebug, currentUser, onLogout, onNavigate, isImpersonating, impersonatedCompanyName, onEndImpersonation, onToggleNotifications, unreadNotificationsCount, theme, toggleTheme, onSearch }) => {
+    const hasDelegatedAdminAccess = Object.entries(currentUser.permissions || {}).some(
+        ([key, value]) =>
+            (key.startsWith('admin_view_') || key.startsWith('admin_tab_'))
+            && value === true
+    );
     const [isDropdownOpen, setDropdownOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [showSearchResults, setShowSearchResults] = useState(false);
@@ -400,7 +405,7 @@ const Header: React.FC<HeaderProps> = ({ currentPage, onToggleSidebar, onToggleD
                                              </button>
                                          </div>
 
-                                         {(currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin') && !isImpersonating && (
+                                         {(currentUser.isAdmin || currentUser.isCompanyAdmin || currentUser.role === 'Super Admin' || hasDelegatedAdminAccess) && !isImpersonating && (
                                              <button type="button" onClick={() => { onNavigate('admin'); setDropdownOpen(false); }} className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-emerald-50 dark:text-gray-200 dark:hover:bg-white/5 text-left border-t border-gray-50 dark:border-white/5 mt-1">
                                                  <Cog6ToothIcon className="w-5 h-5 mr-3 text-slate-500" /> {t('sidebar.admin')}
                                              </button>

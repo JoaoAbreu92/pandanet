@@ -28,7 +28,8 @@ import {
     BriefcaseIcon,
     AcademicCapIcon,
     BookOpenIcon,
-    ArrowPathIcon
+    ArrowPathIcon,
+    SearchIcon
 } from './icons';
 import { useLanguage } from './LanguageContext';
 import { supabase } from '../supabaseClient';
@@ -907,6 +908,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
     const [resetPasswordUser, setResetPasswordUser] = useState<Employee | null>(null);
     const [newPassword, setNewPassword] = useState('');
     const [isResetting, setIsResetting] = useState(false);
+    const [userSearch, setUserSearch] = useState('');
 
     const [attachmentPolicyScope, setAttachmentPolicyScope] =
         useState<'all' | 'department'>('all');
@@ -1382,6 +1384,13 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
 
     const pendingUsers = users.filter(u => u.status === 'pending');
     const activeUsers = users.filter(u => u.status !== 'pending');
+    const normalizedUserSearch = userSearch.trim().toLocaleLowerCase('pt-BR');
+    const filteredActiveUsers = normalizedUserSearch
+        ? activeUsers.filter(user =>
+            [user.name, user.email, user.role, user.team]
+                .some(value => String(value || '').toLocaleLowerCase('pt-BR').includes(normalizedUserSearch))
+        )
+        : activeUsers;
 
     return (
         <div className="space-y-6">
@@ -1590,6 +1599,12 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                     </button>
                 </div>
             }>
+                <div className="mb-4 max-w-xl">
+                    <label className="relative block">
+                        <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                        <input type="search" value={userSearch} onChange={event => setUserSearch(event.target.value)} placeholder="Buscar por nome, e-mail, cargo ou equipe..." className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-3 text-sm text-gray-700 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15" />
+                    </label>
+                </div>
                 <div className="overflow-x-auto max-h-96">
                     <table className="w-full text-sm text-left text-gray-500">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0">
@@ -1602,7 +1617,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, setUsers, plan, depart
                             </tr>
                         </thead>
                         <tbody className="divide-y">
-                            {activeUsers.map(user => (
+                            {filteredActiveUsers.map(user => (
                                 <tr key={user.id} className="bg-white hover:bg-gray-50">
                                     <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
                                         <div className="flex items-center space-x-3">

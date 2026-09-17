@@ -812,6 +812,47 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
         try {
             const cachedBody = bodyCache.current.get(key);
             const knownEmail = emails.find(e => String(e.uid) === String(uid));
+
+            // Reflete a leitura imediatamente na interface. A busca do corpo e a
+            // confirmação no servidor continuam em segundo plano.
+            if (
+                !isGhostMode
+                && knownEmail
+                && !(knownEmail.flags || []).includes('\\Seen')
+            ) {
+                setEmails(prev => prev.map(email =>
+                    String(email.uid) === String(uid)
+                        ? {
+                            ...email,
+                            flags: Array.from(new Set([
+                                ...(email.flags || []),
+                                '\\Seen'
+                            ]))
+                        }
+                        : email
+                ));
+
+                setSelectedEmail(prev => {
+                    if (!prev || String(prev.uid) !== String(uid)) return prev;
+                    return {
+                        ...prev,
+                        flags: Array.from(new Set([
+                            ...(prev.flags || []),
+                            '\\Seen'
+                        ]))
+                    };
+                });
+
+                setLocallySeenUids(prev => {
+                    const next = new Set(prev);
+                    next.add(uid);
+                    return next;
+                });
+
+                setUnseenCount(prev => Math.max(0, prev - 1));
+                markNotificationsByLink(`/email?uid=${uid}`);
+            }
+
             const canUseCache = cachedBody && cachedBody.expires > Date.now() &&
                 knownEmail?.flags?.includes('\\Seen');
             const { data, error } = canUseCache
@@ -860,20 +901,6 @@ const EmailPage: React.FC<{ currentUser: any, pageContext?: any }> = ({ currentU
                 const next = new Set(prev);
                 next.add(uid);
                 return next;
-            });
-
-            setUnseenCount(prev => {
-                const email = emails.find(item =>
-                    item.uid === uid
-                );
-
-                const wasUnread =
-                    email &&
-                    !(email.flags || []).includes('\\Seen');
-
-                return wasUnread
-                    ? Math.max(0, prev - 1)
-                    : prev;
             });
 
             // Mark local real-state emails as seen

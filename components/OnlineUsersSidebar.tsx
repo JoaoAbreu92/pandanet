@@ -9,7 +9,8 @@ import {
     UserCircleIcon,
     ChevronRightIcon,
     ChevronLeftIcon,
-    XMarkIcon
+    XMarkIcon,
+    SearchIcon
 } from './icons';
 import type { Employee } from '../types';
 
@@ -30,6 +31,7 @@ export const OnlineUsersSidebar: React.FC<OnlineUsersSidebarProps> = ({
 }) => {
     const { onlineUsers } = usePresence();
     const [users, setUsers] = useState<any[]>([]);
+    const [userSearch, setUserSearch] = useState('');
     const [localIsOpen, setLocalIsOpen] = useState(true); // Controla visualização no desktop
     const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : localIsOpen;
     const setIsOpen = controlledSetIsOpen !== undefined ? controlledSetIsOpen : setLocalIsOpen;
@@ -103,6 +105,13 @@ export const OnlineUsersSidebar: React.FC<OnlineUsersSidebarProps> = ({
             return (a.full_name || '').localeCompare(b.full_name || '');
         });
     const onlineCount = sortedUsers.filter(user => onlineUsers.has(user.id)).length;
+    const normalizedUserSearch = userSearch.trim().toLocaleLowerCase('pt-BR');
+    const visibleUsers = normalizedUserSearch
+        ? sortedUsers.filter(user =>
+            [user.full_name, user.email, user.role, user.status_text]
+                .some(value => String(value || '').toLocaleLowerCase('pt-BR').includes(normalizedUserSearch))
+        )
+        : sortedUsers;
 
     return (
         <div className={`relative h-full flex transition-[width] duration-300 ${isOpen ? 'w-64 lg:w-72 border-l' : 'w-0'} border-gray-150 dark:border-white/5 bg-white/70 dark:bg-[#020617]/40 backdrop-blur-xl shrink-0`}>
@@ -114,7 +123,7 @@ export const OnlineUsersSidebar: React.FC<OnlineUsersSidebarProps> = ({
                 title={isOpen ? 'Recolher Barra' : 'Expandir Barra'}
             >
                 {isOpen ? <ChevronRightIcon className="w-4 h-4" /> : <ChevronLeftIcon className="w-4 h-4" />}
-                <span className="absolute -right-2 -top-2 flex min-w-5 h-5 items-center justify-center rounded-full border-2 border-white dark:border-slate-900 bg-emerald-500 px-1 text-[10px] font-black leading-none text-white shadow-md">
+                <span className="absolute -left-2 -top-2 flex min-w-5 h-5 items-center justify-center rounded-full border-2 border-white dark:border-slate-900 bg-emerald-500 px-1 text-[10px] font-black leading-none text-white shadow-md">
                     {onlineCount}
                 </span>
             </button>
@@ -132,9 +141,16 @@ export const OnlineUsersSidebar: React.FC<OnlineUsersSidebarProps> = ({
                         </span>
                     </div>
 
+                    <div className="border-b border-gray-100 p-2 dark:border-white/5">
+                        <label className="relative block">
+                            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <input type="search" value={userSearch} onChange={event => setUserSearch(event.target.value)} placeholder="Buscar colaborador..." className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs text-slate-700 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/10 dark:bg-slate-900 dark:text-white" />
+                        </label>
+                    </div>
+
                     {/* User List */}
                     <div className="flex-1 overflow-y-auto p-2 space-y-1 hover-scrollbar">
-                        {sortedUsers.map(user => {
+                        {visibleUsers.map(user => {
                             const isOnline = onlineUsers.has(user.id);
                             const isMuted = mutedUsers.has(user.id);
 
@@ -232,6 +248,7 @@ export const OnlineUsersSidebar: React.FC<OnlineUsersSidebarProps> = ({
                                 </div>
                             );
                         })}
+                        {visibleUsers.length === 0 && <p className="px-3 py-6 text-center text-xs text-slate-400">Nenhum colaborador encontrado.</p>}
                     </div>
                 </div>
             ) : null}
