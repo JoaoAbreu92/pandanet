@@ -17,6 +17,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import HRCalculatorAI from './HRCalculatorAI';
 import FormsPage from './FormsPage';
+import { useNotifications } from './NotificationContext';
 
 interface Payslip {
     id: string;
@@ -93,9 +94,12 @@ const statusConfig = {
     cancelled: { label: 'Cancelado',  color: 'text-gray-600 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-slate-800 dark:border-white/5', icon: XCircleIcon },
 };
 
-const EmployeePortal: React.FC = () => {
+type PortalSection = 'payroll' | 'vacation' | 'documents' | 'timebank' | 'benefits' | 'performance' | 'requests';
+
+const EmployeePortal: React.FC<{ initialSection?: PortalSection }> = ({ initialSection }) => {
     const { profile } = useAuth();
-    const [activeSection, setActiveSection] = useState<'payroll' | 'vacation' | 'documents' | 'timebank' | 'benefits' | 'performance' | 'requests'>('payroll');
+    const { notifications, markNotificationsByLink } = useNotifications();
+    const [activeSection, setActiveSection] = useState<PortalSection>(initialSection || 'payroll');
     const [loading, setLoading] = useState(true);
 
     // Data states
@@ -335,6 +339,29 @@ const EmployeePortal: React.FC = () => {
         return true;
     });
 
+    const requestNotificationKeywords = ['section=requests', 'forms', 'form_', 'request', 'solicit'];
+    const requestNotificationCount = notifications.filter(notification =>
+        !notification.isRead && requestNotificationKeywords.some(keyword =>
+            notification.link?.toLowerCase().includes(keyword)
+            || notification.type?.toLowerCase().includes(keyword)
+        )
+    ).length;
+
+    const openSection = async (section: PortalSection) => {
+        setActiveSection(section);
+        if (section === 'requests') {
+            await Promise.all([
+                markNotificationsByLink('section=requests'),
+                markNotificationsByLink('forms'),
+                markNotificationsByLink('request')
+            ]);
+        }
+    };
+
+    useEffect(() => {
+        if (initialSection) setActiveSection(initialSection);
+    }, [initialSection]);
+
     useEffect(() => {
         if (navItems.length > 0) {
             const isCurrentSectionVisible = navItems.some(item => item.key === activeSection);
@@ -388,7 +415,7 @@ const EmployeePortal: React.FC = () => {
                     {navItems.map(({ key, label, icon: Icon }) => (
                         <button
                             key={key}
-                            onClick={() => setActiveSection(key as any)}
+                            onClick={() => openSection(key as PortalSection)}
                             className={`w-full flex items-center p-4 rounded-2xl transition-all ${
                                 activeSection === key
                                     ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20'
@@ -397,6 +424,11 @@ const EmployeePortal: React.FC = () => {
                         >
                             <Icon className="w-5 h-5 mr-3" />
                             <span className="font-bold">{label}</span>
+                            {key === 'requests' && requestNotificationCount > 0 && (
+                                <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center">
+                                    {requestNotificationCount > 99 ? '99+' : requestNotificationCount}
+                                </span>
+                            )}
                         </button>
                     ))}
                 </aside>

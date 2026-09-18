@@ -96,41 +96,9 @@ const AppContent: React.FC = () => {
     const baseMergedFeatures =
         resolveCommercialFeatures(currentCompany);
 
-    const mergedFeatures: any =
-        ghostAuditActive
-            ? new Proxy(
-                baseMergedFeatures,
-                {
-                    get(target, prop) {
-                        if (
-                            typeof prop === 'symbol'
-                        ) {
-                            return Reflect.get(
-                                target,
-                                prop
-                            );
-                        }
-
-                        const value =
-                            Reflect.get(
-                                target,
-                                prop
-                            );
-
-                        if (
-                            value === false
-                            || value === 'disabled'
-                            || value === undefined
-                            || value === null
-                        ) {
-                            return true;
-                        }
-
-                        return value;
-                    }
-                }
-            )
-            : baseMergedFeatures;
+    // O modo de auditoria pode ignorar permissões pessoais, mas nunca o
+    // contrato comercial da empresa que está sendo auditada.
+    const mergedFeatures: any = baseMergedFeatures;
     const [authStage, setAuthStage] = useState<'logged_in' | 'superadmin_panel'>('logged_in');
 
     // Loading & Error States
@@ -1233,16 +1201,14 @@ const AppContent: React.FC = () => {
 
 
     const canAccess = (permission: keyof EmployeePermissions) => {
-        if (ghostAuditActive) return true;
-
         if (!currentUser) return false;
-        if (
+        const bypassPersonalPermission = ghostAuditActive || (
             currentUser.role === 'Super Admin'
             || currentUser.isAdmin
             || currentUser.isCompanyAdmin
-        ) return true;
+        );
 
-        if (permission === 'viewWhatsPanda') {
+        if (!bypassPersonalPermission && permission === 'viewWhatsPanda') {
             const explicitModulePermission = currentUser.permissions?.viewWhatsPanda;
             const hasWhatsPanda = explicitModulePermission === false
                 ? false
@@ -1253,7 +1219,7 @@ const AppContent: React.FC = () => {
                         && Object.keys(currentUser.whatspanda_permissions).length > 0
                     );
             if (!hasWhatsPanda) return false;
-        } else if (currentUser.permissions?.[permission] !== true) {
+        } else if (!bypassPersonalPermission && currentUser.permissions?.[permission] !== true) {
             return false;
         }
 
@@ -1356,8 +1322,7 @@ const AppContent: React.FC = () => {
 
         const requiredFeature = PAGE_FEATURE_MAP[currentPage];
         if (
-            !ghostAuditActive
-            && requiredFeature
+            requiredFeature
             && !isCommercialFeatureEnabled(
                 mergedFeatures,
                 requiredFeature
@@ -1417,7 +1382,7 @@ const AppContent: React.FC = () => {
             case 'events': return <EventsPage initialEventId={pageContext?.eventId} />;
             case 'announcement-detail': return <AnnouncementDetailPage announcement={pageContext as Announcement} onBack={() => handleNavigate('home')} />;
             case 'jobs': return <JobsPage />;
-            case 'meu-rh': return canAccess('viewMeuRH') ? <EmployeePortal /> : null;
+            case 'meu-rh': return canAccess('viewMeuRH') ? <EmployeePortal initialSection={pageContext?.section} /> : null;
             case 'org-chart': return <OrgChartPage employees={companyData.employees} />;
             case 'kpi-dashboard': return <KPIDashboard />;
             case 'manual-usuario': return <ManualPage />;
@@ -1433,8 +1398,7 @@ const AppContent: React.FC = () => {
                 if (!canAccess('viewScheduling')) return null;
                 const schedulingFeat = mergedFeatures.scheduling as any;
                 if (
-                    !ghostAuditActive
-                    && (
+                    (
                         schedulingFeat === false
                         || schedulingFeat === 'disabled'
                     )
@@ -1447,8 +1411,7 @@ const AppContent: React.FC = () => {
                 if (!canAccess('viewScheduling')) return null;
                 const schedulingFeat = mergedFeatures.scheduling as any;
                 if (
-                    !ghostAuditActive
-                    && (
+                    (
                         schedulingFeat === false
                         || schedulingFeat === 'disabled'
                     )
@@ -1461,8 +1424,7 @@ const AppContent: React.FC = () => {
                 if (!canAccess('viewAgenda')) return null;
                 const agendaFeat = mergedFeatures.new_agenda as any;
                 if (
-                    !ghostAuditActive
-                    && (
+                    (
                         agendaFeat === false
                         || agendaFeat === 'disabled'
                     )
@@ -1475,8 +1437,7 @@ const AppContent: React.FC = () => {
                 if (!canAccess('viewReservations')) return null;
                 const reservationsFeat = mergedFeatures.reservations as any;
                 if (
-                    !ghostAuditActive
-                    && (
+                    (
                         reservationsFeat === false
                         || reservationsFeat === 'disabled'
                     )

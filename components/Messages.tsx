@@ -194,6 +194,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
 }) => {
     const isMe = message.sender === 'me';
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
+    const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
 
     useEffect(() => {
         if (!isMe && message.sender_deleted_at) {
@@ -217,10 +218,50 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
         }
     }, [isMe, message.sender_deleted_at]);
 
+    useEffect(() => {
+        if (!previewImage) return;
+
+        const previousOverflow = document.body.style.overflow;
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') setPreviewImage(null);
+        };
+
+        document.body.style.overflow = 'hidden';
+        window.addEventListener('keydown', handleEscape);
+
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            window.removeEventListener('keydown', handleEscape);
+        };
+    }, [previewImage]);
+
     const formatTime = (seconds: number) => {
         const m = Math.floor(seconds / 60);
         const s = seconds % 60;
         return `${m}:${s.toString().padStart(2, '0')}`;
+    };
+
+    const openAttachmentInBrowser = async (url: string) => {
+        // Abrir a aba imediatamente mantém a ação dentro do clique do usuário e
+        // evita que o bloqueador de pop-ups impeça a visualização após a assinatura.
+        const previewWindow = window.open('about:blank', '_blank');
+        if (!previewWindow) {
+            window.alert('Permita a abertura de pop-ups para visualizar este arquivo.');
+            return;
+        }
+
+        previewWindow.opener = null;
+        previewWindow.document.title = 'Carregando arquivo...';
+        previewWindow.document.body.innerHTML = '<p style="font-family: sans-serif; padding: 24px">Carregando arquivo...</p>';
+
+        try {
+            const resolvedUrl = await getSignedStorageUrl(url);
+            previewWindow.location.replace(resolvedUrl);
+        } catch (error) {
+            previewWindow.close();
+            console.error('Erro ao abrir anexo:', error);
+            window.alert('Não foi possível abrir o arquivo. Tente novamente ou use a opção Baixar.');
+        }
     };
 
     if (!isMe && timeLeft === 0) return null;
@@ -338,7 +379,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                                             src={getCleanImageUrl(message.text)}
                                             alt="Imagem enviada"
                                             className="max-w-full h-auto max-h-64 object-contain cursor-pointer transition-transform hover:scale-105"
-                                            onClick={() => downloadFile(message.text, 'imagem.png')}
+                                            onClick={() => setPreviewImage({ url: message.text, name: 'Imagem enviada' })}
                                             onError={(e) => {
                                                 e.currentTarget.style.display = 'none';
                                                 e.currentTarget.parentElement?.classList.add('hidden');
@@ -356,19 +397,54 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                                     url={message.file.url}
                                     name={message.file.name || 'Imagem enviada'}
                                     className="max-w-full h-auto max-h-64 object-contain cursor-pointer"
-                                    onClick={() =>
-                                        downloadFile(
-                                            message.file!.url,
-                                            message.file!.name || 'imagem.png'
-                                        )
-                                    }
+                                    onClick={() => setPreviewImage({
+                                        url: message.file!.url,
+                                        name: message.file!.name || 'Imagem enviada'
+                                    })}
                                 />
+                                <div className="flex items-center justify-end gap-2 border-t bg-white/90 p-2 text-xs text-slate-700">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPreviewImage({
+                                            url: message.file!.url,
+                                            name: message.file!.name || 'Imagem enviada'
+                                        })}
+                                        className="rounded-md px-2 py-1 font-semibold hover:bg-slate-100"
+                                    >
+                                        Abrir imagem
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => downloadFile(message.file!.url, message.file!.name || 'imagem.png')}
+                                        className="rounded-md px-2 py-1 font-semibold hover:bg-slate-100"
+                                    >
+                                        Baixar
+                                    </button>
+                                </div>
                             </div>
                         ) : message.file ? (
                             <div className="mt-2 p-2 bg-black/10 rounded-lg flex items-center gap-2 overflow-hidden">
                                 <PaperClipIcon className="w-4 h-4 shrink-0" />
-                                <button onClick={() => downloadFile(message.file.url, message.file.name || 'arquivo')} className="text-sm underline truncate hover:text-brand-primary transition-all font-semibold text-left">
+                                <button
+                                    type="button"
+                                    onClick={() => void openAttachmentInBrowser(message.file!.url)}
+                                    className="min-w-0 flex-1 truncate text-left text-sm font-semibold underline transition-all hover:text-brand-primary"
+                                >
                                     {message.file.name}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => void openAttachmentInBrowser(message.file!.url)}
+                                    className="shrink-0 rounded-md bg-white/70 px-2 py-1 text-xs font-bold text-slate-700 hover:bg-white"
+                                >
+                                    Abrir
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => downloadFile(message.file!.url, message.file!.name || 'arquivo')}
+                                    className="shrink-0 rounded-md bg-white/70 px-2 py-1 text-xs font-bold text-slate-700 hover:bg-white"
+                                >
+                                    Baixar
                                 </button>
                             </div>
                         ) : null}
@@ -390,6 +466,49 @@ const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
                     <span className={`text-xs text-gray-400 mt-1 ${isMe ? 'mr-2' : 'ml-1'}`}>{message.timestamp}</span>
                 </div>
             </div>
+            {previewImage && (
+                <div
+                    className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label={`Visualização de ${previewImage.name}`}
+                    onClick={() => setPreviewImage(null)}
+                >
+                    <div
+                        className="relative flex max-h-[94vh] max-w-[94vw] flex-col overflow-hidden rounded-2xl border border-white/20 bg-slate-950 shadow-2xl animate-in zoom-in-95 duration-200"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between gap-4 border-b border-white/15 px-4 py-3 text-white">
+                            <span className="min-w-0 truncate text-sm font-semibold">{previewImage.name}</span>
+                            <div className="flex shrink-0 items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => downloadFile(previewImage.url, previewImage.name || 'imagem.png')}
+                                    className="rounded-lg bg-white/10 px-3 py-2 text-xs font-bold transition-colors hover:bg-white/20"
+                                >
+                                    Baixar
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setPreviewImage(null)}
+                                    className="rounded-lg bg-white/10 p-2 transition-colors hover:bg-white/20"
+                                    aria-label="Fechar imagem"
+                                    title="Fechar"
+                                >
+                                    <XMarkIcon className="h-5 w-5" />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex min-h-0 items-center justify-center overflow-auto p-3">
+                            <ProtectedChatImage
+                                url={previewImage.url}
+                                name={previewImage.name}
+                                className="max-h-[82vh] max-w-[90vw] object-contain"
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 });

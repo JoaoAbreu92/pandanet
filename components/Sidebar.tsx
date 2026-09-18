@@ -186,8 +186,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
 
         // Se a feature não foi aprovada pelo SaaS, não exibir
         if (
-            !ghostSuperAdmin
-            && featureId
+            featureId
             && customFeatures
         ) {
             const feat = customFeatures[featureId] as any;
@@ -217,7 +216,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                     'marketplace': ['marketplace'],
                     'tickets': ['ticket', 'tickets'],
                     'recognition': ['recognition'],
-                    'meu-rh': ['vacation', 'forms', 'benefit'],
+                    'meu-rh': ['meu-rh', 'vacation', 'forms', 'form_', 'benefit', 'payroll', 'payslip', 'timebank', 'hr_'],
                     'training': ['training']
                 };
 
@@ -229,10 +228,15 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
             }).length;
         }
 
+        const unreadPortalNotification = page === 'meu-rh'
+            ? notifications.find(n => !n.isRead && n.link?.toLowerCase().includes('meu-rh'))
+            : undefined;
+        const portalSection = unreadPortalNotification?.link?.match(/[?&]section=([^&]+)/)?.[1] || 'requests';
+
         return (
             <button
                 type="button"
-                onClick={() => onNavigate(page, context)}
+                onClick={() => onNavigate(page, page === 'meu-rh' && badgeCount > 0 ? { section: portalSection } : context)}
                 aria-current={isActive ? 'page' : undefined}
                 className={`group relative flex w-full items-center rounded-xl px-3 py-2.5 text-left transition-all duration-200 ease-out
                     ${isActive
@@ -264,8 +268,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
 
         // Se a feature não existe na listagem de customFeatures de uma empresa, assuma false caso seja um módulo restrito
         if (
-            !ghostSuperAdmin
-            && featureId
+            featureId
         ) {
             const feat = customFeatures ? (customFeatures[featureId] as any) : null;
             const isExplicitlyDisabled = feat === false || feat === 'disabled';
@@ -285,7 +288,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
         if (menuKey === 'ti') {
             menuBadgeCount = notifications.filter(n => !n.isRead && (n.type === 'ticket' || (n.link && n.link.includes('ticket')))).length;
         } else if (menuKey === 'rh') {
-            menuBadgeCount = notifications.filter(n => !n.isRead && (n.type === 'event' || (n.link && (n.link.includes('survey') || n.link.includes('training') || n.link.includes('form'))))).length;
+            const rhKeywords = ['meu-rh', 'vacation', 'survey', 'training', 'form', 'benefit', 'payroll', 'payslip', 'timebank', 'hr_'];
+            menuBadgeCount = notifications.filter(n => !n.isRead && rhKeywords.some(k =>
+                n.type?.toLowerCase().includes(k) || n.link?.toLowerCase().includes(k)
+            )).length;
         } else if (menuKey === 'social') {
             const feedBadgeCount = notifications.filter(n => {
                 if (n.isRead) return false;
@@ -386,7 +392,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onNavigate, currentPage, curr
                 <hr className="my-3 border-white/10" />
 
                 <NavItem page="recognition" label={t('sidebar.recognition')} icon={StarIcon} permission="viewRecognition" featureId="wall" />
-                {/* <NavItem page="kpi-dashboard" label={t('sidebar.metrics')} icon={ShieldCheckIcon} permission="viewKPIDashboard" featureId="kpis" /> */}
+                <NavItem page="kpi-dashboard" label="Indicadores (KPIs)" icon={ChartBarIcon} permission="viewKPIDashboard" featureId="kpis" />
 
                 <NavMenu label={t('sidebar.rh_gestao')} icon={UserGroupIcon} menuKey="rh" permission={hasRhAccess}>
                     <NavItem page="directory" label="Colaboradores" icon={UsersIcon} permission="viewDirectory" featureId="org-chart" />

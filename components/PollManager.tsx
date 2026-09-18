@@ -523,7 +523,33 @@ const PollManager: React.FC = () => {
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
-            setPolls(data || []);
+
+            const companyPolls = data || [];
+            const pollIds = companyPolls.map((poll: any) => poll.id);
+            let votesByOption: Record<string, number> = {};
+
+            if (pollIds.length > 0) {
+                const { data: votes, error: votesError } = await supabase
+                    .from('poll_votes')
+                    .select('poll_id, option_id')
+                    .eq('company_id', currentUser.company_id)
+                    .in('poll_id', pollIds);
+
+                if (votesError) throw votesError;
+
+                votesByOption = (votes || []).reduce((counts: Record<string, number>, vote: any) => {
+                    counts[vote.option_id] = (counts[vote.option_id] || 0) + 1;
+                    return counts;
+                }, {});
+            }
+
+            setPolls(companyPolls.map((poll: any) => ({
+                ...poll,
+                poll_options: (poll.poll_options || []).map((option: any) => ({
+                    ...option,
+                    votes: votesByOption[option.id] || 0
+                }))
+            })));
         } catch (err) {
             console.error('Error fetching polls:', err);
         } finally {

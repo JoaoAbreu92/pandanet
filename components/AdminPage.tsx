@@ -6,6 +6,7 @@ import UserManager from './UserManager';
 import { DepartmentManager } from './DepartmentManager';
 import TeamManager from './TeamManager';
 import FormSubmissionsManager from './FormSubmissionsManager';
+import { DynamicFormsAdmin } from './DynamicForms';
 import MarketplaceManager from './MarketplaceManager';
 import EventsManager from './EventsManager';
 import { SupabaseGenericManager } from './SupabaseGenericManager';
@@ -146,7 +147,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
         { id: 'departments', label: 'Departamentos', category: 'DP (Departamento Pessoal)' },
         { id: 'teams', label: 'Equipes', category: 'DP (Departamento Pessoal)' },
         { id: 'training', label: 'Treinamentos', category: 'DP (Departamento Pessoal)' },
-        { id: 'forms', label: 'Formulários', category: 'DP (Departamento Pessoal)' },
+        { id: 'forms', label: 'Formulários', category: 'DP (Departamento Pessoal)', featureId: 'forms' },
         { id: 'policies', label: 'Políticas', category: 'DP (Departamento Pessoal)', featureId: 'policies' },
         { id: 'onboarding', label: 'Onboarding (Integração)', category: 'DP (Departamento Pessoal)' },
         { id: 'documentos', label: 'Biblioteca Corporativa', category: 'DP (Departamento Pessoal)' },
@@ -337,7 +338,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ company, setCompany, plan, custom
                     onUpdateEmployees={setEmployees}
                 />;
             case 'forms':
-                return <FormSubmissionsManager />;
+                return <div className="space-y-6"><DynamicFormsAdmin /><FormSubmissionsManager /></div>;
             case 'marketplace':
                 return <MarketplaceManager />;
             case 'events':

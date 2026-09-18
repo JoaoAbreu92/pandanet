@@ -29,6 +29,7 @@ import {
     AcademicCapIcon,
     BookOpenIcon,
     ArrowPathIcon,
+    ChartBarIcon,
     SearchIcon
 } from './icons';
 import { useLanguage } from './LanguageContext';
@@ -609,6 +610,8 @@ const UserFormModal: React.FC<{
                                         <PermissionToggle icon={<RocketLaunchIcon className="w-4 h-4" />} label="Onboarding" name="viewOnboarding" checked={formData.permissions.viewOnboarding} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                         <PermissionToggle icon={<StarIcon className="w-4 h-4" />} label="Reconhecimentos" name="viewRecognition" checked={formData.permissions.viewRecognition} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                         <PermissionToggle icon={<FolderIcon className="w-4 h-4" />} label="Gestão de Projetos" name="viewProjects" checked={formData.permissions.viewProjects} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
+                                        <PermissionToggle icon={<ChartBarIcon className="w-4 h-4" />} label="Visualizar Indicadores (KPIs)" name="viewKPIDashboard" checked={formData.permissions.viewKPIDashboard} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c, ...(c ? {} : { manageKPIs: false }) } }))} />
+                                        <PermissionToggle icon={<ChartBarIcon className="w-4 h-4" />} label="Gerenciar Indicadores (KPIs)" name="manageKPIs" checked={formData.permissions.manageKPIs} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, manageKPIs: c, ...(c ? { viewKPIDashboard: true } : {}) } }))} />
                                         <PermissionToggle icon={<FolderIcon className="w-4 h-4" />} label="Biblioteca de Documentos" name="viewDocuments" checked={formData.permissions.viewDocuments} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                         <PermissionToggle icon={<HeartIcon className="w-4 h-4" />} label="Bem Estar" name="viewWellbeing" checked={formData.permissions.viewWellbeing} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />
                                         <PermissionToggle icon={<BuildingOfficeIcon className="w-4 h-4" />} label="Meu RH (Holerites e Férias)" name="viewMeuRH" checked={formData.permissions.viewMeuRH} onChange={(n, c) => setFormData(p => ({ ...p, permissions: { ...p.permissions, [n]: c } }))} />

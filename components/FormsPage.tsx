@@ -6,6 +6,7 @@ import type { FormSubmission, FormStatus } from '../types';
 import { useLanguage } from './LanguageContext';
 import { supabase, downloadFile } from '../supabaseClient';
 import { useAuth } from './AuthContext';
+import { DynamicFormsUser } from './DynamicForms';
 
 const VacationRequestModal: React.FC<{
     onClose: () => void;
@@ -720,6 +721,7 @@ const FormsPage: React.FC = () => {
         <>
             <div className="space-y-6">
                 <h1 className="text-3xl font-bold text-brand-text dark:text-white">{t('forms.title')}</h1>
+                <DynamicFormsUser />
                 <Card title={t('forms.available')}>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div onClick={() => setVacationModalOpen(true)} className="p-6 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-white/5 rounded-2xl hover:bg-emerald-50 dark:hover:bg-slate-800 hover:border-emerald-300 cursor-pointer transition-colors text-center group flex flex-col justify-between h-56">

@@ -40,6 +40,8 @@ interface Project {
     color: string;
     status: string;
     manager_id: string;
+    created_by?: string;
+    can_edit?: boolean;
     created_at: string;
     manager?: { full_name: string; avatar_url: string };
     task_count?: number;
@@ -200,6 +202,9 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
     const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
     const [editingProject, setEditingProject] = useState<Project | null>(null);
     const [projectForm, setProjectForm] = useState({ name: '', description: '', color: '#10B981', manager_id: '' });
+    const [projectDepartmentIds, setProjectDepartmentIds] = useState<string[]>([]);
+    const [projectEditorIds, setProjectEditorIds] = useState<string[]>([]);
+    const [projectMemberSearch, setProjectMemberSearch] = useState('');
 
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState<ProjectTask | null>(null);
@@ -263,11 +268,15 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
         if (isProjectModalOpen) {
             if (editingProject) {
                 const loadProjectStages = async () => {
-                    const { data, error } = await supabase
-                        .from('project_stages')
-                        .select('id, name, responsible_id, checklist_items, position')
-                        .eq('project_id', editingProject.id)
-                        .order('position', { ascending: true });
+                    const [{ data, error }, departmentsResult, membersResult] = await Promise.all([
+                        supabase
+                            .from('project_stages')
+                            .select('id, name, responsible_id, checklist_items, position')
+                            .eq('project_id', editingProject.id)
+                            .order('position', { ascending: true }),
+                        supabase.from('project_departments').select('department_id').eq('project_id', editingProject.id),
+                        supabase.from('project_members').select('user_id').eq('project_id', editingProject.id).eq('can_edit', true)
+                    ]);
                     if (data && !error) {
                         setProjectStagesForm(data.map(d => ({
                             id: d.id,
@@ -276,9 +285,14 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                             checklist_items: Array.isArray(d.checklist_items) ? d.checklist_items : []
                         })));
                     }
+                    setProjectDepartmentIds((departmentsResult.data || []).map((item: any) => item.department_id));
+                    setProjectEditorIds((membersResult.data || []).map((item: any) => item.user_id));
                 };
                 loadProjectStages();
             } else {
+                setProjectDepartmentIds([]);
+                setProjectEditorIds([]);
+                setProjectMemberSearch('');
                 setProjectStagesForm([
                     { name: 'Setor Comercial', responsible_id: '', checklist_items: ['Validar briefing', 'Montar proposta'] },
                     { name: 'Setor de Criação', responsible_id: '', checklist_items: ['Definir layout', 'Aprovar com cliente'] },
@@ -305,7 +319,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
             // Buscar projetos
             const { data: projData, error: projError } = await supabase
                 .from('projects')
-                .select('*, manager:profiles(full_name, avatar_url)')
+                .select('*, manager:profiles!projects_manager_id_fkey(full_name, avatar_url)')
                 .eq('company_id', currentUser.company_id)
                 .order('created_at', { ascending: false });
 
@@ -318,11 +332,19 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
 
             if (countError) throw countError;
 
+            const { data: editableProjects } = await supabase
+                .from('project_members')
+                .select('project_id')
+                .eq('user_id', currentUser.id)
+                .eq('can_edit', true);
+            const editableProjectIds = new Set((editableProjects || []).map((item: any) => item.project_id));
+
             const mappedProjects = (projData || []).map((p: any) => {
                 const projectTasks = (countData || []).filter((t: any) => t.project_id === p.id);
                 const completedTasks = projectTasks.filter((t: any) => t.stage?.name === 'Concluído' || t.stage?.name === 'Done');
                 return {
                     ...p,
+                    can_edit: p.created_by === currentUser.id || editableProjectIds.has(p.id),
                     task_count: projectTasks.length,
                     completed_task_count: completedTasks.length
                 };
@@ -459,8 +481,10 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
 
             if (stageError) throw stageError;
 
-            // Se o projeto for novo e não tiver estágios, criar os estágios padrão do Odoo
-            if (!stageData || stageData.length === 0) {
+            // Somente quem pode editar deve inicializar um projeto legado sem etapas.
+            // Observadores nunca podem gerar escrita apenas por abrir os detalhes.
+            const canInitializeStages = project.created_by === currentUser?.id || project.can_edit === true;
+            if ((!stageData || stageData.length === 0) && canInitializeStages) {
                 const defaultStages = [
                     { project_id: project.id, name: 'Novo', position: 1 },
                     { project_id: project.id, name: 'Em Progresso', position: 2 },
@@ -476,7 +500,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                 stageData = insertedStages || [];
             }
 
-            setStages(stageData);
+            setStages(stageData || []);
 
             // Buscar tarefas do projeto
             const { data: taskData, error: taskError } = await supabase
@@ -563,6 +587,10 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
             showToast('O projeto precisa ter pelo menos um setor/estágio.', 'warning');
             return;
         }
+        if (projectDepartmentIds.length === 0) {
+            showToast('Selecione pelo menos um setor que poderá visualizar o projeto.', 'warning');
+            return;
+        }
 
         try {
             const payload = {
@@ -584,15 +612,31 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
 
                 if (error) throw error;
             } else {
-                const { data: insertData, error: insertError } = await supabase
-                    .from('projects')
-                    .insert([payload])
-                    .select()
-                    .single();
+                const { data: insertData, error: insertError } = await supabase.rpc('stage33_create_project', {
+                    target_name: projectForm.name,
+                    target_description: projectForm.description || null,
+                    target_color: projectForm.color,
+                    target_manager_id: projectForm.manager_id || null
+                });
 
                 if (insertError) throw insertError;
-                projectId = insertData.id;
+                projectId = insertData;
             }
+
+            if (!projectId) throw new Error('Não foi possível identificar o projeto salvo.');
+
+            const automaticEditorIds = [
+                projectForm.manager_id,
+                ...projectStagesForm.map(stage => stage.responsible_id)
+            ].filter(Boolean);
+            const editorIds = Array.from(new Set([...projectEditorIds, ...automaticEditorIds]));
+
+            const { error: accessError } = await supabase.rpc('stage33_set_project_access', {
+                target_project_id: projectId,
+                target_department_ids: projectDepartmentIds,
+                target_editor_ids: editorIds
+            });
+            if (accessError) throw accessError;
 
             // --- SALVAR ESTÁGIOS / SETORES ---
             // 1. Apagar estágios que foram removidos
@@ -640,6 +684,9 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
             setIsProjectModalOpen(false);
             setEditingProject(null);
             setProjectForm({ name: '', description: '', color: '#10B981', manager_id: '' });
+            setProjectDepartmentIds([]);
+            setProjectEditorIds([]);
+            setProjectMemberSearch('');
             setProjectStagesForm([]);
             fetchProjects();
             if (selectedProject && selectedProject.id === projectId) {
@@ -1271,13 +1318,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
     // --- HELPERS PARA FLUXO E PERMISSÕES DE SETOR ---
     const canUserModifyTaskInStage = (task: ProjectTask | null, stage: ProjectStage | null | undefined) => {
         if (!task || !stage) return false;
-        if (currentUser?.isAdmin || currentUser?.isCompanyAdmin || currentUser?.role === 'Super Admin' || selectedProject?.manager_id === currentUser?.id) {
-            return true;
-        }
-        if (stage.responsible_id === currentUser?.id) {
-            return true;
-        }
-        return false;
+        return selectedProject?.created_by === currentUser?.id || selectedProject?.can_edit === true;
     };
 
     const getIncompleteStageChecklistItems = (task: ProjectTask, stage: ProjectStage | undefined) => {
@@ -1526,6 +1567,9 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                             onClick={() => {
                                 setEditingProject(null);
                                 setProjectForm({ name: '', description: '', color: '#10B981', manager_id: '' });
+                                setProjectDepartmentIds([]);
+                                setProjectEditorIds([]);
+                                setProjectMemberSearch('');
                                 setIsProjectModalOpen(true);
                             }}
                             className="flex items-center space-x-2 px-6 py-3 text-sm font-black text-white bg-brand-primary rounded-2xl hover:bg-emerald-600 shadow-lg shadow-emerald-250 transition-all active:scale-95"
@@ -1549,7 +1593,14 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                         <h3 className="text-lg font-black text-slate-700 dark:text-slate-300">Nenhum projeto cadastrado</h3>
                         <p className="text-slate-450 mt-1 max-w-md mx-auto">Comece criando um projeto para organizar as tarefas da sua equipe e monitorar o progresso.</p>
                         <button
-                            onClick={() => setIsProjectModalOpen(true)}
+                            onClick={() => {
+                                setEditingProject(null);
+                                setProjectForm({ name: '', description: '', color: '#10B981', manager_id: '' });
+                                setProjectDepartmentIds([]);
+                                setProjectEditorIds([]);
+                                setProjectMemberSearch('');
+                                setIsProjectModalOpen(true);
+                            }}
                             className="mt-6 inline-flex items-center space-x-2 px-6 py-2.5 bg-brand-primary text-white text-sm font-bold rounded-xl"
                         >
                             <PlusIcon className="w-4 h-4" /> <span>Criar Primeiro Projeto</span>
@@ -1573,6 +1624,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                             <h3 className="text-lg font-black text-slate-800 dark:text-slate-100 group-hover:text-brand-primary transition-colors pr-8 truncate">
                                                 {proj.name}
                                             </h3>
+                                            {proj.created_by === currentUser?.id && (
                                             <div className="flex gap-1 absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button
                                                     onClick={(e) => {
@@ -1595,6 +1647,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                                     <TrashIcon className="w-4 h-4" />
                                                 </button>
                                             </div>
+                                            )}
                                         </div>
 
                                         <p className="text-xs text-slate-450 dark:text-slate-500 line-clamp-3 mb-4">
@@ -2682,10 +2735,46 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                 </div>
                             </div>
 
-                            {/* --- SETORES E CHECKLISTS DO PROJETO --- */}
+                            <div className="border-t pt-4 dark:border-slate-800 space-y-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-widest">Setores que podem visualizar</label>
+                                    <p className="text-[11px] text-slate-400 mt-1">O projeto aparecerá somente para colaboradores vinculados aos setores selecionados.</p>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto custom-scrollbar">
+                                    {departments.map(department => (
+                                        <label key={department.id} className={`flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition ${projectDepartmentIds.includes(department.id) ? 'border-brand-primary bg-brand-primary/5' : 'border-slate-200 dark:border-slate-700'}`}>
+                                            <input type="checkbox" checked={projectDepartmentIds.includes(department.id)} onChange={() => setProjectDepartmentIds(previous => previous.includes(department.id) ? previous.filter(id => id !== department.id) : [...previous, department.id])} />
+                                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{department.name}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                                {projectDepartmentIds.length === 0 && <p className="text-[11px] font-semibold text-amber-600">Sem setor selecionado, o projeto continuará visível para toda a empresa.</p>}
+                            </div>
+
+                            <div className="border-t pt-4 dark:border-slate-800 space-y-3">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-widest">Colaboradores que podem editar</label>
+                                    <p className="text-[11px] text-slate-400 mt-1">Somente estas pessoas e o criador poderão alterar o projeto. Gerente e responsáveis das etapas entram automaticamente.</p>
+                                </div>
+                                <input type="search" value={projectMemberSearch} onChange={event => setProjectMemberSearch(event.target.value)} placeholder="Buscar colaborador por nome, cargo ou e-mail..." className="w-full p-3 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-primary/20 dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto custom-scrollbar">
+                                    {employees.filter(employee => {
+                                        const term = projectMemberSearch.trim().toLocaleLowerCase('pt-BR');
+                                        if (!term) return true;
+                                        return [employee.name, (employee as any).email, (employee as any).role, (employee as any).position].some(value => String(value || '').toLocaleLowerCase('pt-BR').includes(term));
+                                    }).map(employee => (
+                                        <label key={employee.id} className={`flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition ${projectEditorIds.includes(employee.id) ? 'border-brand-primary bg-brand-primary/5' : 'border-slate-200 dark:border-slate-700'}`}>
+                                            <input type="checkbox" checked={projectEditorIds.includes(employee.id)} onChange={() => setProjectEditorIds(previous => previous.includes(employee.id) ? previous.filter(id => id !== employee.id) : [...previous, employee.id])} />
+                                            <span className="min-w-0"><span className="block truncate text-xs font-bold text-slate-700 dark:text-slate-200">{employee.name}</span><span className="block truncate text-[10px] text-slate-400">{(employee as any).position || (employee as any).role || 'Colaborador'}</span></span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* --- ETAPAS E CHECKLISTS DO PROJETO --- */}
                             <div className="border-t pt-4 dark:border-slate-800 space-y-4">
                                 <div className="flex justify-between items-center">
-                                    <label className="block text-[10px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-widest">Setores / Estágios do Projeto</label>
+                                    <label className="block text-[10px] font-bold text-slate-450 dark:text-slate-400 uppercase tracking-widest">Etapas do fluxo do projeto</label>
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -2696,13 +2785,13 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                         }}
                                         className="text-xs font-black text-brand-primary hover:text-emerald-600 flex items-center gap-1"
                                     >
-                                        + Adicionar Setor
+                                        + Adicionar Etapa
                                     </button>
                                 </div>
 
                                 <div className="space-y-4 max-h-[250px] overflow-y-auto pr-1 custom-scrollbar">
                                     {projectStagesForm.length === 0 ? (
-                                        <p className="text-xs text-slate-400 italic text-center py-4">Nenhum setor configurado. Adicione setores para este projeto.</p>
+                                        <p className="text-xs text-slate-400 italic text-center py-4">Nenhuma etapa configurada. Adicione etapas ao fluxo do projeto.</p>
                                     ) : (
                                         projectStagesForm.map((stage, sIdx) => (
                                             <div key={sIdx} className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border dark:border-slate-800/80 space-y-3 relative group/stage">
@@ -2719,7 +2808,7 @@ const ProjectsPage: React.FC<ProjectsPageProps> = ({ defaultTab, customFeatures,
                                                 
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                     <div>
-                                                        <label className="block text-[9px] font-bold text-slate-450 uppercase mb-1">Nome do Setor</label>
+                                                        <label className="block text-[9px] font-bold text-slate-450 uppercase mb-1">Nome da Etapa</label>
                                                         <input
                                                             type="text"
                                                             required
